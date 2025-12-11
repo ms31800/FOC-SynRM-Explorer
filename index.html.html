@@ -1,0 +1,5720 @@
+<!DOCTYPE html>
+
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Explorateur FOC — Clarke, Park &amp; SVPWM</title>
+<!-- p5.js pour les visus abc / αβ / dq -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+#foc-panel input[type=range]{margin-top:12px;margin-bottom:12px;}
+
+    :root {
+      --bg:#0b0f14;
+      --panel:#111827;
+      --muted:#94a3b8;
+      --text:#e5e7eb;
+      --accent:#22d3ee;angleDegEl
+    }
+    * {
+      box-sizing:border-box;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    body {
+      margin:0;
+      background:radial-gradient(1200px 600px at 30% -10%, #0f172a 0, #0b0f14 60%);
+      color:var(--text);
+    }
+    header {
+      padding:18px 22px;
+      border-bottom:1px solid #1f2937;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    header h1 { margin:0; font-size:20px; }
+    header .sub { color:var(--muted); font-size: 14px; }
+
+    .mode-switch {
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      font-size: 14px;
+    }
+    .mode-switch button {
+      background:#1f2937;
+      border:1px solid #334155;
+      color:#cbd5e1;
+      padding:6px 10px;
+      border-radius:999px;
+      cursor:pointer;
+    }
+    .mode-switch button.active {
+      background:#0ea5e9;
+      color:white;
+      border-color:#0ea5e9;
+    }
+
+    .wrap {
+      display:flex;
+      flex-direction:column;
+      min-height: calc(100vh - 64px);
+    }
+    
+    .top-controls{
+      padding:0 16px 8px 16px;
+    }
+    .top-controls-inner{
+      display:grid;
+      grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr);
+      gap:12px;
+      align-items:stretch;
+      background:transparent;
+    }
+    .top-controls .control{
+      flex:1 1 260px;
+    }
+.sidebar{
+      grid-area: sidebar;
+      padding:16px;
+      background: linear-gradient(160deg, rgba(15,23,42,0.9), rgba(15,23,42,1));
+      border-right:1px solid #1f2937;
+    }
+    .canvas-wrap{
+      grid-area: main;
+      padding:16px;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      gap:12px;
+    }
+
+    .controls{display:grid; gap:12px}
+    .control{
+      background:var(--panel);
+      border:1px solid #1f2937;
+      padding:12px;
+      border-radius:14px;
+      position:relative;
+    }
+    .control h3{
+      margin:0 0 8px 0;
+      font-size:13px;
+      font-weight:600;
+      color:#cbd5e1
+    }
+    .row{display:flex; align-items:center; gap:10px}
+    input[type=range]{width:100%}
+    .value{
+      min-width:68px;
+      text-align:right;
+      color:var(--accent);
+      font-variant-numeric: tabular-nums
+    }
+    .btns{display:flex; gap:8px; flex-wrap:wrap}
+    button{
+      background:#0ea5e9;
+      color:white;
+      border:0;
+      padding:8px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:600
+    }
+    button.secondary{background:#334155}
+    button.ghost{background:transparent; border:1px solid #334155}
+
+    .top-row{display:flex;gap:16px;margin-bottom:16px;align-items:stretch;}
+    .top-row > .panel{flex:1 1 0;}
+    #schema-panel{flex:0.20 1 0;}
+    #panel-svpwm-signals{flex:3.1 1 0;}
+
+    .panels{
+      display:grid;
+      grid-template-columns:minmax(0,1.0fr) minmax(0,2.0fr);
+      gap:16px
+    }
+    .panel-col-left{display:flex;flex-direction:column;gap:16px}
+    .panel{
+      background:var(--panel);
+      border:1px solid #1f2937;
+      border-radius:16px;
+      padding:12px
+    }
+    .panel h2{
+      margin:0 0 10px 0;
+      font-size:14px;
+      color:#cbd5e1
+    }
+    canvas{
+      width:100% !important;
+      height:auto !important;
+      border-radius:12px;
+      display:block
+    }
+    .legend {
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      font-size: 14px;
+      color:#cbd5e1;
+    }
+    .chip { display:inline-flex; align-items:center; gap:6px; }
+    .dot { width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .aa{background:#ef4444} .bb{background:#22c55e} .cc{background:#3b82f6}
+
+    .footer{
+      padding:10px 16px 14px;
+      font-size:11px;
+      color:#64748b;
+      border-top:1px solid #1f2937;
+      text-align:center
+    }
+
+    /* Panneau schéma FOC */
+    #schema-panel {
+      grid-column: 1 / -1;
+      margin-bottom:8px;
+    }
+    #schema-foc {
+      position:relative;
+      background:#020617;
+      border-radius:14px;
+      border:1px solid #1f2937;
+      padding:8px;
+    
+	#schema-tooltip {
+  position:absolute;
+  left:20px;
+  transform:translateX(0%);
+  bottom:150px;
+  max-width:260px;
+  padding:8px 10px;
+  font-size:13px;
+  line-height:1.4;
+  background:rgba(15,23,42,0.97);
+  border:1px solid #1f2937;
+  border-radius:10px;
+  color:#e5e7eb;
+  box-shadow:0 10px 22px rgba(0,0,0,0.55);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.12s ease-out;
+}
+      
+	  
+	  
+    }
+    #schema-foc svg {
+  width:100%;
+  height:auto;
+  display:block;
+  margin:0 auto;
+}
+    .foc-highlight {
+      outline: 2px solid #0ea5e9;
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 960px){
+      .wrap{ grid-template-columns:1fr; grid-template-areas:"main" "sidebar"; }
+    @media (max-width: 900px){
+      .top-controls-inner{
+        grid-template-columns:1fr;
+      }
+    }
+
+    }
+    @media (max-width: 700px){
+      header { flex-direction:column; align-items:flex-start; gap:6px; }
+      .panels{ grid-template-columns:1fr; }
+    }
+  
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #1f2937;
+      background:#020617;
+      color:#9ca3af;
+      font-size:11px;
+      white-space:nowrap;
+    }
+    .pill b{
+      color:#e5e7eb;
+      font-variant-numeric:tabular-nums;
+    }
+    .pill input{
+      margin:0;
+    }
+
+    /* Smaller sliders */
+    input[type=range]{
+      height:4px;
+    }
+    input[type=range]::-webkit-slider-thumb{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+    }
+    input[type=range]::-moz-range-thumb{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+    }
+
+
+    /* Sliders smaller + left aligned */
+    .control input[type=range]{
+      max-width: 300px;
+      display: block;
+      margin-left: 0;
+    }
+    .control .row{
+      justify-content: flex-start;
+    }
+
+
+    /* Align sliders to the right */
+    .control input[type=range]{
+      max-width: 300px;
+      display: block;
+      margin-left: auto;
+      margin-right: 0;
+    }
+    .control .row{
+      justify-content: flex-end;
+    }
+
+
+    /* Sliders aligned in a vertical column near labels */
+    .control .row{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .control .row label{
+      min-width: 110px;
+      text-align:left;
+    }
+    .control .row input[type=range]{
+      max-width:240px;
+      flex:0 0 240px;
+      margin:0;
+      margin-left:20px;
+    }
+    .control .row .value{
+      min-width:60px;
+      text-align:right;
+    }
+    /* Special case: slowmo row where label takes more space */
+    #slowmo.row, .control .row label[for="slowmo"]{
+      min-width:140px;
+    }
+
+
+    /* Final alignment: sliders in a left column close to labels */
+    .control .row{
+      justify-content:flex-start;
+    }
+    .control input[type=range]{
+      max-width:300px;
+      display:block;
+      margin:0;
+    }
+
+
+
+#schema-foc svg {
+  display:block;
+  margin:0 auto;
+  max-height:500px;
+  width:auto;
+}
+
+
+/* Align all sliders further left */
+.control .row label{
+  min-width: 120px !important;
+  white-space: nowrap;
+}
+
+
+
+  #inverter-wrap {
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed #1f2937;
+  }
+  #inverter-wrap svg {
+    max-width:780px;
+    width:105%;
+    height:auto;
+    display:block;
+    margin:16px auto 8px;
+}
+
+.diode-on,
+.diode-on * {
+  stroke:#facc15 !important;   /* jaune / doré pour conduction */
+  fill:#facc15 !important;
+  opacity:1;
+}
+
+.diode-off,
+.diode-off * {
+  stroke:#0ea5e9 !important;   /* turquoise “réseau” */
+  fill:#020617 !important;     /* fond presque noir */
+  opacity:0.4;
+}
+
+/* Condensateur bus DC : état normal */
+.cap-weak,
+.cap-weak * {
+  stroke:#93f0fb !important;   /* bleu clair comme le bus DC */
+  fill:#020617 !important;
+  opacity:0.5;
+  transition:opacity 0.12s linear, stroke 0.12s linear, fill 0.12s linear;
+}
+
+
+/* Condensateur bus DC : état calme */
+.cap-weak,
+.cap-weak * {
+  stroke:#93f0fb !important;    /* bleu clair */
+  fill:#020617 !important;
+  opacity:0.5;
+  transition: opacity 0.15s linear, stroke 0.15s linear, fill 0.15s linear;
+}
+
+/* Condensateur sous forte recharge */
+.cap-strong,
+.cap-strong * {
+  stroke:#f97316 !important;    /* orange énergie */
+  fill:#f97316 !important;
+  opacity:1;
+  transition: opacity 0.15s linear, stroke 0.15s linear, fill 0.15s linear;
+}
+
+
+
+/* Condensateur "flash" quand le pont conduit fort */
+.cap-strong,
+.cap-strong * {
+  stroke:#f97316 !important;   /* orange façon énergie qui passe */
+  fill:#f97316 !important;
+  opacity:1;
+  transition:opacity 0.12s linear, stroke 0.12s linear, fill 0.12s linear;
+}
+
+/* faible courant */
+.coil-zero *,
+.coil-zero {
+  stroke:#0ea5e9 !important; 
+  opacity:0.4;
+}
+
+/* courant positif */
+.coil-pos *,
+.coil-pos {
+  stroke:#ef4444 !important;   /* rouge */
+  opacity:1;
+}
+
+/* courant négatif */
+.coil-neg *,
+.coil-neg {
+  stroke:#3b82f6 !important;   /* bleu */
+  opacity:1;
+}
+
+
+
+.igbt-on-high { stroke:#ff0000 !important; fill:#ff0000 !important; opacity:1; }
+.igbt-on-low  { stroke:#0000ff !important; fill:#0000ff !important; opacity:1; }
+.igbt-off     { stroke:#111827 !important; fill:#020617 !important; opacity:0.5; }
+
+/* Applique la couleur aux enfants des groupes T1..T6 */
+.igbt-on-high * { stroke:#ef4444 !important; fill:#ef4444 !important; }
+.igbt-on-low  * { stroke:#3b82f6 !important; fill:#3b82f6 !important; }
+.igbt-off     * { stroke:#e5e7eb !important; fill:#020617 !important; }
+
+
+
+.igbt-red {
+  transform-box: fill-box;
+  transform-origin: center;
+  stroke:#ffffff;
+  fill:#ffffff;
+  transition:opacity 0.12s linear, stroke 0.12s linear, fill 0.12s linear;
+}
+
+/* Diode non conductrice : visible mais atténuée */
+.diode-off,
+.diode-off * {
+  stroke: #0ea5e9 !important;   /* turquoise du réseau */
+  fill: #02121f !important;      /* fond sombre, mais visible */
+  opacity: 0.75;                 /* moitié visible */
+}
+
+
+/* Diode en conduction */
+.diode-on,
+.diode-on * {
+  stroke:#facc15 !important;   /* jaune / doré */
+  fill:#facc15 !important;
+  opacity:1;
+}
+
+
+
+#theta { height: 2px !important; }
+#theta::-webkit-slider-thumb{height:8px !important;width:8px !important;}
+
+#theta { max-width:50% !important; width:50% !important; }
+
+
+#hex-wrap {
+  position: relative;
+}
+#hex-wrap .hex-play {
+  position: absolute;
+  right: 24px;
+  top: 40px;
+}
+#hex-wrap .hex-rotor-controls {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #9ca3af;
+}
+#clarke-park-formulas {
+  font-size: 14px;
+  max-height: 160px;
+  overflow:hidden;
+  
+  position:absolute;
+  top:2%;
+  left: calc(50% - 240px);
+  width: calc(64% - 100px);
+  max-width: 340px;
+  padding:8px 10px;
+  background:rgba(15,23,42,0.97);
+  border-radius:12px;
+  border:1px solid #1f2937;
+  box-shadow:0 10px 22px rgba(0,0,0,0.55);
+  font-size:11px;
+}
+#clarke-park-formulas h2{
+  font-size: 14px;
+  margin:0 0 6px 0;
+}
+#clarke-park-formulas #formula-holder{
+  height:auto;
+  min-height: 110px;
+  }
+  #panel-svpwm-formulas.collapsed #svpwm-formulas-body{
+  display:none;
+}
+#toggle-svpwm-formulas{
+  cursor:pointer;
+}
+
+
+  /* Correction IGBT: états ON/OFF visibles sur fond sombre */
+  .igbt-on-high {
+    stroke:#ef4444 !important;
+    fill:#ef4444 !important;
+    opacity:1;
+  }
+  .igbt-on-low {
+    stroke:#3b82f6 !important;
+    fill:#3b82f6 !important;
+    opacity:1;
+  }
+  .igbt-off {
+    stroke:#e5e7eb !important;
+    fill:#020617 !important;
+    opacity:0.85;
+  }
+  .igbt-red {
+    transform-box: fill-box;
+    transform-origin: center;
+    stroke:#e5e7eb;
+    fill:#020617;
+    transition:opacity 0.12s linear, stroke 0.12s linear, fill 0.12s linear, transform 0.08s linear;
+  }
+  
+/* Overlay plein écran pour l'aide détaillée */
+#schema-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65); /* voile sombre */
+  display: none;                      /* masqué par défaut */
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Panneau central */
+#schema-help-panel {
+  max-width: 480px;
+  width: calc(100% - 40px);
+  background: rgba(15, 23, 42, 0.98);
+  border-radius: 16px;
+  border: 1px solid #1f2937;
+  padding: 16px 18px 14px;
+  box-shadow: 0 24px 40px rgba(0, 0, 0, 0.6);
+  color: #e5e7eb;
+  font-size: 13px;
+  line-height: 1.5;
+  position: relative;
+}
+
+/* Titre */
+#schema-help-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Texte */
+#schema-help-text {
+  font-size: 13px;
+}
+
+/* Bouton de fermeture */
+#schema-help-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#schema-help-close:hover {
+  color: #e5e7eb;
+}
+
+  #panel-svpwm-signals canvas:first-of-type {
+  margin-bottom: px;
+}
+
+  
+  
+  
+ #mcc-panel {
+  position: absolute;
+  top: -340px;   /* vers le bas */
+  right: 400px; /* vers la gauche/droite */
+}
+
+  #mcc-wrap {
+    background:#020617;
+    border-radius:0px;
+    border:0px solid #1f2937;
+    padding:0px;
+  }
+  #mcc-wrap svg {
+    display:block;
+    width:100%;
+    height:90%;
+  }
+
+
+  #mcc-text-panel {
+    position:absolute;
+    top:-340px;      /* même référence que le MCC, à ajuster si besoin */
+    right:100px;      /* espace raisonnable entre le MCC et le bord droit */
+    width:320px;
+    background:#020617;
+    border-radius:12px;
+    border:1px solid #1f2937;
+    padding:12px 14px;
+    color:#e5e7eb;
+  }
+  #mcc-text-panel h2 {
+    font-size:15px;
+    margin:0 0 8px 0;
+    color:#cbd5e1;
+  }
+  .mcc-intro-text {
+    font-size:14px;
+    line-height:1.3;
+    color:#9ca3af;
+  }
+
+
+.phasor-tooltip {
+  position: fixed;
+  z-index: 2000;
+  max-width: 280px;
+  padding: 8px 10px;
+  background: rgba(15,23,42,0.96);
+  border-radius: 8px;
+  border: 1px solid #334155;
+  color: #e5e7eb;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+
+.mcc-tooltip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 260px;
+  padding: 8px 10px;
+  background: rgba(15,23,42,0.96);   /* fond sombre cohérent avec le thème */
+  border-radius: 1px;
+  border: 1px solid #334155;
+  color: #e5e7eb;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 1px 10px rgba(0,0,0,0.5);
+}
+
+#mcc-wrap svg {
+    transform: scale(1);
+    transform-origin: top left; /* ou center selon ton besoin */
+}
+
+/* agrandissement du panneau MCC */
+#mcc-panel {
+    width: 330px;   /* augmente la largeur ici */
+    min-height: 200px; /* optionnel */
+}
+
+#clarke-park-visu {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+#cvClarkePark {
+  width: 100%;
+  max-width: 520px;
+  height: 220px;
+  background: #020617;
+  border-radius: 10px;
+  border: 1px solid #1f2937;
+}
+
+.panel-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-header-row h2 {
+  margin: 0;
+}
+
+.btn-toggle {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #38bdf8;
+  background: #0f172a;
+  color: #e0f2fe;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-toggle:hover {
+  background: #38bdf8;
+  color: #0f172a;
+}
+
+/* déjà proposé pour l’animation, je le rappelle au cas où */
+#clarke-park-visu {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+#cvClarkePark {
+  width: 100%;
+  max-width: 520px;
+  height: 220px;
+  background: #020617;
+  border-radius: 10px;
+  border: 1px solid #1f2937;
+}
+
+#clarke-park-content{
+
+text-align:left;
+
+
+}
+
+
+
+
+    .info-icon {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:16px;
+      height:16px;
+      margin-left:6px;
+      border-radius:999px;
+      border:1px solid #38bdf8;
+      font-size:11px;
+      font-weight:600;
+      color:#e0f2fe;
+      cursor:pointer;
+      background:transparent;
+      transition:background 0.2s,color 0.2s,border-color 0.2s;
+    }
+    .info-icon:hover {
+      background:#38bdf8;
+      color:#0f172a;
+      border-color:#38bdf8;
+    }
+
+    .info-box {
+      position:absolute;
+      right:8px;
+      top:72px;
+      max-width:320px;
+      padding:10px 12px;
+      background:#020617;
+      border-radius:10px;
+      border:1px solid #1f2937;
+      box-shadow:0 10px 30px rgba(0,0,0,0.7);
+      font-size:13px;
+      color:#e5e7eb;
+      line-height:1.4;
+      z-index:50;
+    }
+
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>Explorateur FOC — Clarke, Park &amp; SVPWM</h1>
+<div style="font-size:14px; margin-top:4px; color:#9ca3af;">Lycée Paul Mathou - FCIL - version 08/12/2025</div>
+<div class="sub">Chaîne complète : abc → αβ → dq → SVPWM → machine</div>
+</div>
+</header>
+<div class="wrap">
+<section class="top-controls">
+<div class="top-controls-inner">
+<div class="control">
+  
+  <h3>FOC (repère dq)</h3>
+
+<div style="margin-top:6px;font-size: 14px;color:var(--muted);font-weight:500">
+  Période PWM Ts = <span id="TsFOC">–</span> µs
+  (<span id="fPWMFOC">–</span> kHz)<br>
+  Vdc = <span id="VdcFOC">–</span> V ·
+  m = <span id="mFOC">–</span><br>
+  Vmax linéaire = m·Vdc/√3 = <span id="VmaxFOC">–</span> V<br>
+  |Vref| instantané = <span id="VrefFOC">–</span> V
+</div>
+
+
+
+
+
+<div class="row" style="margin-top:4px;">
+<label for="slowmo">0,01× → 4×</label>
+<input id="slowmo" max="4" min="0.01" step="0.01" type="range" value="0.01"/>
+<div class="value"><span id="slowmoVal">0.01×</span></div>
+</div>
+<div class="row">
+<label for="freq">f<sub>élec</sub> (Hz)</label>
+<input id="freq" max="100" min="1" step="1" type="range" value="50"/>
+<div class="value"><span id="freqVal">50</span> Hz</div>
+</div>
+<div class="row">
+<label for="amp">I<sub>phase</sub> (u.a.)<span class="info-icon" onclick="toggleIphaseHelp()">ⓘ</span></label>
+<input id="amp" max="2.0" min="0.2" step="0.1" type="range" value="1.0"/>
+<div class="value"><span id="ampVal">1.0</span></div>
+</div>
+<div class="row">
+<label for="imb">Déséquilibre</label>
+<input id="imb" max="50" min="0" step="5" type="range" value="0"/>
+<div class="value"><span id="imbVal">0</span> %</div>
+</div>
+
+<div id="iphasetooltip" class="info-box" style="display:none;">
+  <b>Note pédagogique — curseur Iphase</b><br/><br/>
+  Dans cette animation, le curseur <b>Iphase</b> règle l’amplitude des courants triphasés.
+  Pour simplifier la démonstration du SVPWM, on suppose qu’une augmentation de cette
+  consigne de courant entraîne une augmentation proportionnelle de la tension de
+  référence appliquée au modulateur.<br/><br/>
+  Ce n’est pas un modèle moteur complet, mais une abstraction pédagogique qui illustre le lien
+  fonctionnel <b>courant demandé → tension requise → modulation MLI</b>
+  tel qu’il est réalisé par les régulateurs de courant d’un variateur réel.
+</div>
+
+
+</div>
+</section>
+<main class="canvas-wrap">
+<div class="error" id="load-error" style="display:none"></div>
+
+<!-- Introduction MCC — panneau à droite -->
+
+
+<div id="mcc-zone" style="position:relative;">
+
+  <section class="panel" id="mcc-panel">
+  <h2>La machine à courant continu (MCC)</h2>
+    <div id="mcc-wrap">
+      <!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="74mm"
+   height="73mm"
+   viewBox="0 0 74 73"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   sodipodi:docname="MCC.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="2.5620931"
+     inkscape:cx="81.183623"
+     inkscape:cy="152.02414"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" /><defs
+     id="defs1"><marker
+       style="overflow:visible"
+       id="RoundedArrow"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid"><path
+         transform="scale(0.7)"
+         d="m -0.21114562,-4.1055728 6.42229122,3.21114561 a 1,1 90 0 1 0,1.78885438 L -0.21114562,4.1055728 A 1.236068,1.236068 31.717474 0 1 -2,3 v -6 a 1.236068,1.236068 148.28253 0 1 1.78885438,-1.1055728 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="path8" /></marker><marker
+       style="overflow:visible"
+       id="RoundedArrow-1"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid"><path
+         transform="scale(0.7)"
+         d="m -0.21114562,-4.1055728 6.42229122,3.21114561 a 1,1 90 0 1 0,1.78885438 L -0.21114562,4.1055728 A 1.236068,1.236068 31.717474 0 1 -2,3 v -6 a 1.236068,1.236068 148.28253 0 1 1.78885438,-1.1055728 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="path8-3" /></marker><marker
+       style="overflow:visible"
+       id="RoundedArrow-6"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Rounded arrow"
+       markerWidth="1"
+       markerHeight="1"
+       viewBox="0 0 1 1"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid"><path
+         transform="scale(0.7)"
+         d="m -0.21114562,-4.1055728 6.42229122,3.21114561 a 1,1 90 0 1 0,1.78885438 L -0.21114562,4.1055728 A 1.236068,1.236068 31.717474 0 1 -2,3 v -6 a 1.236068,1.236068 148.28253 0 1 1.78885438,-1.1055728 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="path8-0" /></marker></defs><g
+     inkscape:label="Calque 1"
+     inkscape:groupmode="layer"
+     id="layer1"><rect
+       style="fill:#041109;fill-opacity:0.973635;stroke:#000000;stroke-width:0.56923;stroke-dasharray:none;stroke-opacity:1"
+       id="rect9"
+       width="72.944817"
+       height="71.912132"
+       x="0.70422542"
+       y="0.70422482" /><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;fill-opacity:0;stroke:#000000;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="54.341709"
+       y="154.34842"
+       id="text5"><tspan
+         sodipodi:role="line"
+         id="tspan5"
+         style="stroke-width:0.4"
+         x="54.341709"
+         y="154.34842" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.4"
+         id="tspan6"
+         x="54.341709"
+         y="158.31717" /></text><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.6;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 48.826657,56.745471 h -4.32079"
+       id="path5-0-7-1-4"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#00ff00;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.6;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 50.390887,18.390127 h -5.89561"
+       id="path5-0-7-1-4-9-6"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><g
+       id="Inducteur1"
+       transform="translate(-62.954598,-62.580669)"><text
+         xml:space="preserve"
+         style="font-size:3.32759px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ea2005;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0.225656;stroke-dasharray:none;stroke-opacity:1"
+         x="61.806713"
+         y="107.88198"
+         id="text1-6"
+         transform="scale(1.0654951,0.93853082)"><tspan
+           sodipodi:role="line"
+           style="fill:#ea2005;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0.225656;stroke-dasharray:none"
+           x="61.806713"
+           y="107.88198"
+           id="tspan8">Inducteur</tspan></text><g
+         id="Inducteur"><path
+           d="m 81.758239,89.008833 v 2.52097 q 9.33305,2.01678 0,4.03356 9.33305,2.016787 0,4.033587 9.33305,2.01678 0,4.03357 9.33305,2.01679 0,4.03358 9.33305,2.0168 0,4.03359 v 2.52099"
+           fill="none"
+           stroke="#000000"
+           stroke-width="20"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           id="path1-6"
+           style="fill:none;stroke:#ff0000;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+           inkscape:export-filename="path1.svg"
+           inkscape:export-xdpi="96"
+           inkscape:export-ydpi="96" /><path
+           style="display:inline;fill:none;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.4;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+           d="m 81.756439,80.797118 v 8.159175"
+           id="path5-0-7"
+           inkscape:connector-type="polyline"
+           inkscape:connector-curvature="0" /><path
+           style="display:inline;fill:none;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.4;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+           d="m 81.756439,112.95169 v 6.56688"
+           id="path5-0-7-1"
+           inkscape:connector-type="polyline"
+           inkscape:connector-curvature="0" /><path
+           style="display:inline;fill:none;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.467244;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+           d="m 81.953589,119.34279 h -5.89561"
+           id="path5-0-7-1-4-9"
+           inkscape:connector-type="polyline"
+           inkscape:connector-curvature="0" /><path
+           style="display:inline;fill:none;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.4;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+           d="M 81.954719,80.996673 H 76.059145"
+           id="path5-0-7-1-4-9-6-6"
+           inkscape:connector-type="polyline"
+           inkscape:connector-curvature="0" /></g></g><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.6;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 44.717057,18.250099 v 6.043446"
+       id="path5-0-7-6"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.6;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 44.727747,52.489521 v 4.43032"
+       id="path5-0-7-1-1"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><g
+       id="induit_r"><circle
+         style="fill:#fff6f6;fill-opacity:1;stroke:#ffffff;stroke-width:0.911;stroke-dasharray:none;stroke-opacity:1"
+         id="induit"
+         cx="44.691238"
+         cy="38.002781"
+         r="13.631433" /><g
+         id="g6"
+         transform="translate(-59.943654,-63.639002)"
+         style="fill:#fff6f6;fill-opacity:1;stroke:#00ff00"><g
+           id="g5"
+           transform="translate(13.070903,-15.188536)"
+           style="fill:#fff6f6;fill-opacity:1;stroke:#00ff00"><path
+             d="m 91.584859,108.47936 0.0091,-0.0415 v 1.0646 c 0,6.63752 -0.0015,0.58336 0,-1.04144 -0.02571,5.65598 0.02593,-1.62242 0,4.03357 6.222033,1.34453 6.222033,2.68905 0,4.03358 6.222033,1.34453 6.222033,2.68906 0,4.03359 v 2.52099"
+             fill="none"
+             stroke="#000000"
+             stroke-width="20"
+             stroke-linecap="round"
+             stroke-linejoin="round"
+             id="path1-6-6"
+             style="fill:#fff6f6;fill-opacity:1;stroke:#00ff00;stroke-width:0.6;stroke-dasharray:none;stroke-opacity:1"
+             inkscape:export-filename="path1.svg"
+             inkscape:export-xdpi="96"
+             inkscape:export-ydpi="96"
+             sodipodi:nodetypes="cssccccc" /></g></g><path
+         style="display:inline;fill:#00ff00;fill-opacity:1;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.563163;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+         d="m 44.721007,24.154955 v 8.599128"
+         id="path5-0-7-1-1-5"
+         inkscape:connector-type="polyline"
+         inkscape:connector-curvature="0" /><path
+         style="display:inline;fill:#fff6f6;fill-opacity:1;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.562148;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+         d="m 44.726037,42.819081 v 9.273275"
+         id="path5-0-7-1-1-5-0"
+         inkscape:connector-type="polyline"
+         inkscape:connector-curvature="0" /></g><g
+       id="balais"
+       transform="matrix(0.99819448,0,0,1.0418051,-60.119184,-66.714175)"
+       style="fill:#f71900;fill-opacity:1;stroke-width:0;stroke-dasharray:none"><rect
+         style="fill:#f71900;fill-opacity:1;stroke:#f9f9f9;stroke-width:0;stroke-dasharray:none;stroke-opacity:1"
+         id="rect3"
+         width="4.3813086"
+         height="2.1906543"
+         x="102.80935"
+         y="84.997391" /><rect
+         style="fill:#f71900;fill-opacity:1;stroke:#ffffff;stroke-width:0;stroke-dasharray:none;stroke-opacity:1"
+         id="rect3-2"
+         width="4.3813086"
+         height="2.1906543"
+         x="102.80935"
+         y="114.0564" /></g><text
+       xml:space="preserve"
+       style="font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:none;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="9.6574202"
+       y="20.014059"
+       id="text3"><tspan
+         sodipodi:role="line"
+         id="tspan3"
+         style="fill:none;stroke:#ff0000;stroke-width:0.4"
+         x="9.6574202"
+         y="20.014059">+</tspan></text><text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ff0000;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0;stroke-dasharray:none;stroke-opacity:1"
+       x="15.356383"
+       y="16.575651"
+       id="Id"><tspan
+         sodipodi:role="line"
+         id="tspan3-4"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ff0000;stroke:#ff0000;stroke-width:0;stroke-dasharray:none"
+         x="15.356383"
+         y="16.575651">Id</tspan></text><text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#00ff00;fill-opacity:0.973635;stroke:#7d3ff8;stroke-width:0;stroke-dasharray:none;stroke-opacity:1"
+       x="51.034561"
+       y="16.146818"
+       id="Iq"><tspan
+         sodipodi:role="line"
+         id="tspan3-4-8"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#00ff00;stroke:#7d3ff8;stroke-width:0;stroke-dasharray:none;stroke-opacity:1"
+         x="51.034561"
+         y="16.146818">Iq</tspan></text><text
+       xml:space="preserve"
+       style="font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#00ff00;fill-opacity:0.973635;stroke:#00ff00;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="50.911995"
+       y="20.12454"
+       id="text3-6"><tspan
+         sodipodi:role="line"
+         id="tspan3-5"
+         style="fill:#00ff00;stroke:#00ff00;stroke-width:0.4;stroke-opacity:1"
+         x="50.911995"
+         y="20.12454">+</tspan></text><text
+       xml:space="preserve"
+       style="font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:none;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="10.459047"
+       y="57.827099"
+       id="text3-61"><tspan
+         sodipodi:role="line"
+         id="tspan3-3"
+         style="fill:none;stroke:#ff0000;stroke-width:0.4"
+         x="10.459047"
+         y="57.827099">-</tspan></text><text
+       xml:space="preserve"
+       style="font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0.973635;stroke:#00ff00;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="49.535706"
+       y="57.987988"
+       id="text3-61-4"><tspan
+         sodipodi:role="line"
+         id="tspan3-3-6"
+         style="fill:#ffffff;stroke:#00ff00;stroke-width:0.4"
+         x="49.535706"
+         y="57.987988">-</tspan></text><path
+       style="fill:none;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#RoundedArrow)"
+       d="m 13.941905,18.433412 h 2.426809"
+       id="path3"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="fill:#00ff00;fill-rule:evenodd;stroke:#00ff00;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#RoundedArrow-1)"
+       d="m 49.196767,18.419388 h -2.42681"
+       id="path3-8"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0.973635;stroke:#f9f9f9;stroke-width:0;stroke-dasharray:none;stroke-opacity:1"
+       x="56.6381"
+       y="25.036077"
+       id="Couple"><tspan
+         sodipodi:role="line"
+         id="tspan3-4-8-2"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:4.5861px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#ffffff;stroke:#f9f9f9;stroke-width:0;stroke-dasharray:none"
+         x="56.6381"
+         y="25.036077"><tspan
+   style="fill:#00ff00"
+   id="tspan1">T</tspan>, <tspan
+   style="fill:#e74503;fill-opacity:0.973635;stroke:#c0111b;stroke-opacity:1"
+   id="tspan7">n</tspan></tspan></text><path
+       style="fill:none;fill-opacity:0.973635;stroke:#fffcfc;stroke-width:0.420817;stroke-linecap:round;stroke-linejoin:bevel;stroke-dasharray:none;stroke-opacity:1;paint-order:markers fill stroke;marker-end:url(#RoundedArrow)"
+       d="m 58.892207,28.726016 c 10.69661,9.618295 0,18.332285 0,18.332285"
+       id="path2" /><g
+       id="g1"><title
+         id="title1">Flux_f</title><path
+         style="fill:#ffff00;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.524778;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-end:url(#RoundedArrow-6)"
+         d="m 26.04223,38.244811 h 9.516867"
+         id="a"
+         inkscape:connector-type="polyline"
+         inkscape:connector-curvature="0" /><text
+         xml:space="preserve"
+         style="font-size:3.32759px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:none;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0.326;stroke-dasharray:none;stroke-opacity:1"
+         x="25.132452"
+         y="38.249352"
+         id="Flux"
+         transform="scale(1.0654951,0.93853082)"><tspan
+           sodipodi:role="line"
+           style="fill:none;fill-opacity:0.973635;stroke:#ff0000;stroke-width:0.326;stroke-dasharray:none"
+           x="25.132452"
+           y="38.249352"
+           id="tspan8-5">FLUX</tspan></text></g><text
+       xml:space="preserve"
+       style="font-size:3.32759px;font-family:Arial;-inkscape-font-specification:'Arial, Normal';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#00ff00;fill-opacity:0.973635;stroke:#00ff00;stroke-width:0.126;stroke-dasharray:none;stroke-opacity:1"
+       x="32.444706"
+       y="48.462727"
+       id="Flux-7"
+       transform="scale(1.0654951,0.93853082)"><tspan
+         sodipodi:role="line"
+         style="fill:#00ff00;fill-opacity:0.973635;stroke:#00ff00;stroke-width:0.126;stroke-dasharray:none"
+         x="32.444706"
+         y="48.462727"
+         id="tspan8-5-1">Induit</tspan></text></g></svg>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+  </section>
+  <section class="panel" id="mcc-text-panel">
+    <h2>FOC — principe inspiré de la MCC </h2>
+    <div class="mcc-intro-text">
+      <p>
+        Le contrôle vectoriel (FOC) reprend le principe de la machine à courant continu représentée ci-contre :
+        on sépare le <b>courant de flux</b> (axe d, noté Id) du <b>courant de couple</b>
+        (axe q, noté Iq).
+      </p>
+      <p>
+        Dans une MCC, l&apos;inducteur crée le flux et l&apos;induit fournit le couple.
+        En FOC, on reproduit cette séparation dans un repère tournant synchronisé avec
+        le champ magnétique du rotor.
+      </p>
+      <p>
+        Ainsi, une machine synchrone ou asynchrone se commande presque comme une MCC
+        à excitation séparée : un axe pour le flux, un axe pour le couple.
+      </p>
+    </div>
+  </section>
+
+</div>
+
+<!-- 1) Ton schéma bloc FOC au-dessus de tout -->
+<div class="top-row">
+
+<section class="panel" id="schema-panel">
+<h2>Chaîne de contrôle FOC — Schéma bloc</h2>
+
+
+<div id="schema-foc">
+
+<!-- Panneau d'aide détaillée pour les blocs FOC -->
+<div id="schema-help-overlay">
+  <div id="schema-help-panel">
+    <button id="schema-help-close" aria-label="Fermer l'aide">×</button>
+    <h2 id="schema-help-title"></h2>
+    <div id="schema-help-text"></div>
+  </div>
+</div>
+
+<div id="schema-foc-container"></div>
+ 
+ <div id="schema-tooltip"></div>
+ 
+ 
+ 
+	  
+	  
+	  <div style="text-align:center; margin-top: 10px; font-size: 14px; color:#aaa;">
+  <i>
+    Remarque : « Pour des raisons pédagogiques, la fréquence du “réseau triphasé” est ralentie dans l’animation afin de rendre visible la conduction des diodes.
+En pratique, le pont redresseur est alimenté par un réseau fixe (50&nbsp; Hz). »
+  
+  </i>
+  
+  <section class="panel" id="clarke-park-panel">
+  <div class="panel-header-row">
+    <h2>Transformées de Clarke &amp; Park — Introduction</h2>
+    <button id="btnToggleClarkePark"
+            class="btn-toggle"
+            type="button"
+            onclick="toggleClarkeParkIntro()">
+      Afficher
+    </button>
+  </div>
+
+ <!-- masqué au chargement -->
+  <div id="clarke-park-content" style="display:none;">
+
+
+  <div id="clarke-park-content">
+    <!-- ton texte d'introduction -->
+    <P>
+      Le pilotage moderne des machines tournantes triphasées repose sur deux avancées majeures du début
+      du XXᵉ siècle : <b>la transformée de Clarke</b>, due à Edith Clarke, et <b>la transformée de Park</b>,
+      proposée par Robert H. Park. Grâce aux progrès de l’électronique de puissance, leurs théories sont
+      aujourd’hui au cœur des variateurs de vitesse à commande vectorielle.
+    </p>
+
+    <P>
+      ● <b>La transformée de Clarke</b> convertit les grandeurs triphasées (a, b, c) en un repère fixe
+      orthogonal (α, β).<br><br>
+      ● <b>La transformée de Park</b> effectue une rotation vers un repère tournant (d, q) aligné sur le flux,
+      ce qui permet de séparer flux (Id) et couple (Iq).
+    </p>
+
+    <P>
+      Ensemble, ces transformations permettent de contrôler une machine triphasée comme une MCC idéale :
+      <b>Id</b> régule le flux, <b>Iq</b> régule le couple. Elles forment le véritable <b>cerveau</b> des variateurs
+      à commande vectorielle (FOC).
+    </p>
+
+    <!-- VISU Clarke-Park synchronisée -->
+    <div id="clarke-park-visu">
+      <canvas id="cvClarkePark" width="480" height="220"></canvas>
+    </div>
+  </div>
+</section>
+
+  
+  
+  
+  
+  
+  
+  
+  
+<div id="schema-tooltip"></div>
+  
+  
+</div>
+ 
+	   
+		   
+<div id="clarke-park-formulas" class="panel">
+  <h2>Transformations Clarke / Park</h2>
+  <div id="formula-holder"></div>
+</div>
+</div>
+</section>
+
+
+<section class="panel" id="panel-svpwm-signals">
+<h2>Signaux — PWM &amp; tensions de phase</h2>
+<canvas height="190" id="cvPWM" style="margin-top:8px"></canvas>
+<canvas height="160" id="cvOUT" style="margin-top:24px"></canvas>
+</section>
+</div>
+<!-- 2) Panneaux d’animation (Clarke/Park + SVPWM) -->
+<div class="panels">
+<div class="panel-col-left">
+<section class="panel" id="panel-formulas"><h2>Onduleur triphasé — pont IGBT</h2>
+
+
+<div id="inverter-wrap">
+  <h3 style="margin:4px 0 4px 0;font-size: 14px;color:var(--muted);font-weight:500;">
+    Onduleur triphasé (IGBT rouges synchronisés avec θ<sub>élec</sub>)
+  </h3>
+ <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="107mm"
+   height="60mm"
+   viewBox="0 0 107 60"
+   version="1.1"
+   id="inverter-svg"
+   xml:space="preserve"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   sodipodi:docname="inverter2nde_version10_whiteBridgeCleanV2.svg"
+   inkscape:export-filename="inverter.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.90583675"
+     inkscape:cx="246.7332"
+     inkscape:cy="138.54594"
+     inkscape:window-width="1233"
+     inkscape:window-height="945"
+     inkscape:window-x="75"
+     inkscape:window-y="8"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="layer1"
+     showgrid="false" /><defs
+     id="defs1" /><g
+     inkscape:label="Calque 1"
+     inkscape:groupmode="layer"
+     id="layer1"><rect
+       style="fill:#111827;stroke:#000000;stroke-width:0.917796;stroke-linecap:round;stroke-linejoin:bevel;stroke-dasharray:none;paint-order:markers fill stroke"
+       id="rect1"
+       width="105.255"
+       height="59.19762"
+       x="0.92829168"
+       y="0.54361075" /><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="88.37603"
+       y="24.095787"
+       id="text10-8-7-4"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1-2"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="88.37603"
+         y="24.095787">e1</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="88.584274"
+       y="31.691929"
+       id="text10-8-7-4-9"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1-2-8"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="88.584274"
+         y="31.691929">e2</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="88.730316"
+       y="38.324535"
+       id="text10-8-7-4-6"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1-2-0"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="88.730316"
+         y="38.324535">e3</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="24.623667"
+       y="30.09156"
+       id="text10-8"><tspan
+         sodipodi:role="line"
+         id="tspan10-2"
+         style="fill:#ffffff;stroke:#ffffff;stroke-width:0.4"
+         x="24.623667"
+         y="30.09156">+</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="35.36237"
+       y="15.538184"
+       id="a_"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="35.36237"
+         y="15.538184">T2</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="35.087505"
+       y="47.972324"
+       id="text10-8-7-6"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1-1"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="35.087505"
+         y="47.972324">T1</tspan></text><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.307058;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 19.430509,30.920284 h 7.752778"
+       id="path5-0-7-7"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.307058;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 19.430509,33.564682 h 7.752778"
+       id="path5-0-7-7-3"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       d="m 60.473713,30.831808 h 2.52097 q 2.01678,-9.33305 4.03356,0 2.01679,-9.33305 4.03359,0 2.01678,-9.33305 4.03357,0 2.01679,-9.33305 4.03358,0 2.0168,-9.33305 4.03359,0 h 2.52099"
+       fill="none"
+       stroke="#000000"
+       stroke-width="20"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="coilB_sinus"
+       style="fill:none;stroke:#ffffff;stroke-width:0.511;stroke-dasharray:none;stroke-opacity:1"
+       inkscape:export-filename="path2.svg"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" /><path
+       d="m 60.61626,22.71608 h 2.52097 q 2.01678,-9.33305 4.03356,0 2.01679,-9.33305 4.03359,0 2.01678,-9.33305 4.03357,0 2.01679,-9.33305 4.03358,0 2.0168,-9.33305 4.03359,0 h 2.52099"
+       fill="none"
+       stroke="#000000"
+       stroke-width="20"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="coilA_sinus"
+       style="fill:none;stroke:#ffffff;stroke-width:0.511;stroke-dasharray:none;stroke-opacity:1"
+       inkscape:export-filename="path1.svg"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" /><path
+       d="m 60.54365,38.081951 h 2.52097 q 2.01678,-9.33305 4.03356,0 2.01679,-9.33305 4.03359,0 2.01678,-9.33305 4.03357,0 2.01679,-9.33305 4.03358,0 2.0168,-9.33305 4.03359,0 h 2.52099"
+       fill="none"
+       stroke="#000000"
+       stroke-width="20"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="coilC_sinus"
+       style="fill:none;stroke:#ffffff;stroke-width:0.511;stroke-dasharray:none;stroke-opacity:1"
+       inkscape:export-filename="path1.svg"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.500111;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 49.190231,30.835105 H 60.802847"
+       id="coilB_bridge"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.592526;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 12.955526,5.4139261 H 57.68687"
+       id="path5-0-6"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.588886;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 13.692892,55.894338 H 57.876127"
+       id="path5-0-6-1"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;fill-opacity:0;stroke:#000000;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="64.478256"
+       y="95.804611"
+       id="text5"><tspan
+         sodipodi:role="line"
+         id="tspan5"
+         style="stroke-width:0.4"
+         x="64.478256"
+         y="95.804611" /><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.4"
+         id="tspan6"
+         x="64.478256"
+         y="99.773361" /></text><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.459566;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 40.690535,5.4555361 V 12.058196"
+       id="path5-3-6-8-7"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ff0000;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.674258;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 40.690535,18.420916 v -6.34449"
+       id="T2"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ff0000;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.671508;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 48.964244,12.076426 v 6.292856"
+       id="T4"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ff0000;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.671508;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 57.656475,12.076426 v 6.292856"
+       id="T6"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ff0000;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.674258;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 40.649526,50.312334 v -6.34449"
+       id="T1"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ff0000;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.671508;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 48.923232,43.967844 V 50.2607"
+       id="T3"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ff0000;fill-rule:evenodd;stroke:#ff0000;stroke-width:0.671508;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 57.615462,43.967844 V 50.2607"
+       id="T5"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.548615;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 40.690555,18.413972 -3.9e-5,25.551482"
+       id="path5-3-7-2-8-3-7-7"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.548615;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 23.306918,5.4980141 -4e-5,25.5514809"
+       id="path5-3-7-2-8-3-7-7-82"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.511337;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 23.306918,33.709334 -4e-5,22.195216"
+       id="path5-3-7-2-8-3-7-7-82-7"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.407922;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 40.690565,50.344679 -6e-5,5.686682"
+       id="path5-3-7-2-8-3-7-7-8"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.510978;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 40.682826,22.69856 H 62.15237"
+       id="path5-0-7"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.443781;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 57.76358,38.090661 h 2.912997"
+       id="path5-0-7-4"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.468464;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 48.964244,5.1673941 V 12.028225"
+       id="path5-3-6-8-7-8"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.548662;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 48.964264,18.366147 -4e-5,25.556046"
+       id="path5-3-7-2-8-3-7-7-5"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.4;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 48.964274,50.27561 -6e-5,5.46759"
+       id="path5-3-7-2-8-3-7-7-8-0"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.470224;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 57.656475,5.1989681 V 12.111433"
+       id="path5-3-6-8-7-8-8"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.5485;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 57.656495,18.371904 -4e-5,25.540925"
+       id="path5-3-7-2-8-3-7-7-5-0"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.511;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 86.03712,22.536352 -4e-5,15.683822"
+       id="path5-3-7-2-8-3-7-7-5-0-0"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0" /><path
+       style="display:inline;fill:#ffffff;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.4;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="m 57.656505,50.255552 -6e-5,5.46759"
+       id="path5-3-7-2-8-3-7-7-8-0-7"
+       inkscape:connector-type="polyline"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cc" /><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="10.073025"
+       y="6.5201654"
+       id="text10"><tspan
+         sodipodi:role="line"
+         id="tspan10"
+         style="fill:#ffffff;stroke:#ffffff;stroke-width:0.4"
+         x="10.073025"
+         y="6.5201654">+</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="11.776955"
+       y="56.760242"
+       id="text11"><tspan
+         sodipodi:role="line"
+         id="tspan11"
+         style="fill:#ffffff;stroke:#ffffff;stroke-width:0.4;stroke-opacity:1"
+         x="11.776955"
+         y="56.760242">-</tspan></text><g
+       id="layer1-2"
+       transform="translate(-39.845119,-41.84705)"><text
+         xml:space="preserve"
+         style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+         x="83.150955"
+         y="57.295017"
+         id="text10-8-7-2"><tspan
+           sodipodi:role="line"
+           style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+           x="83.150955"
+           y="57.295017"
+           id="tspan1">T4</tspan></text><g
+         id="layer1-6"
+         transform="translate(23.547917,-3.439584)"><text
+           xml:space="preserve"
+           style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+           x="68.486832"
+           y="60.909412"
+           id="text10-8-7-1"><tspan
+             sodipodi:role="line"
+             id="tspan10-2-1-8"
+             style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+             x="68.486832"
+             y="60.909412">T6</tspan></text></g></g><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="43.951092"
+       y="48.115902"
+       id="text10-8-7-5"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1-4"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="43.951092"
+         y="48.115902">T3</tspan></text><g
+       id="layer1-3"
+       transform="translate(-24.189144,-9.977568)"><text
+         xml:space="preserve"
+         style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+         x="77.36792"
+         y="58.017895"
+         id="text10-8-7-3"><tspan
+           sodipodi:role="line"
+           id="tspan10-2-1-41"
+           style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+           x="77.36792"
+           y="58.017895">T5</tspan></text></g><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="17.7791"
+       y="29.107384"
+       id="text10-8-7-6-7"><tspan
+         sodipodi:role="line"
+         id="tspan10-2-1-1-1"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="17.7791"
+         y="29.107384">C</tspan></text><path
+       d="m 60.61626,22.71608 h 2.52097"
+       fill="none"
+       stroke="#000000"
+       stroke-width="20"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="coilA_bridge"
+       style="fill:none;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       inkscape:export-filename="path1.svg"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96"
+       sodipodi:nodetypes="cc" /><path
+       d="m 60.54365,38.081951 h 2.52097"
+       fill="none"
+       stroke="#000000"
+       stroke-width="20"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="coilC_bridge"
+       style="fill:none;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       inkscape:export-filename="path1.svg"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96"
+       sodipodi:nodetypes="cc" /><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="24.623667"
+       y="30.09156"
+       id="text2"><tspan
+         sodipodi:role="line"
+         id="tspan2"
+         style="fill:#ffffff;stroke:#ffffff;stroke-width:0.4"
+         x="24.623667"
+         y="30.09156">+</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="35.36237"
+       y="15.538184"
+       id="text3"><tspan
+         sodipodi:role="line"
+         id="tspan3"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="35.36237"
+         y="15.538184">T2</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="35.087505"
+       y="47.972324"
+       id="text4"><tspan
+         sodipodi:role="line"
+         id="tspan4"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="35.087505"
+         y="47.972324">T1</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="10.073025"
+       y="6.5201654"
+       id="text27"><tspan
+         sodipodi:role="line"
+         id="tspan27"
+         style="fill:#ffffff;stroke:#ffffff;stroke-width:0.4"
+         x="10.073025"
+         y="6.5201654">+</tspan></text><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.4;stroke-dasharray:none;stroke-opacity:1"
+       x="11.776955"
+       y="56.760242"
+       id="text28"><tspan
+         sodipodi:role="line"
+         id="tspan28"
+         style="fill:#ffffff;stroke:#ffffff;stroke-width:0.4;stroke-opacity:1"
+         x="11.776955"
+         y="56.760242">-</tspan></text><g
+       id="g31"
+       transform="translate(-39.845119,-41.84705)"><text
+         xml:space="preserve"
+         style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+         x="83.150955"
+         y="57.295017"
+         id="text29"><tspan
+           sodipodi:role="line"
+           style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+           x="83.150955"
+           y="57.295017"
+           id="tspan29">T4</tspan></text><g
+         id="g30"
+         transform="translate(23.547917,-3.439584)"><text
+           xml:space="preserve"
+           style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+           x="68.486832"
+           y="60.909412"
+           id="text30"><tspan
+             sodipodi:role="line"
+             id="tspan30"
+             style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+             x="68.486832"
+             y="60.909412">T6</tspan></text></g></g><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="43.951092"
+       y="48.115902"
+       id="text31"><tspan
+         sodipodi:role="line"
+         id="tspan31"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="43.951092"
+         y="48.115902">T3</tspan></text><g
+       id="g32"
+       transform="translate(-24.189144,-9.977568)"><text
+         xml:space="preserve"
+         style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+         x="77.36792"
+         y="58.017895"
+         id="text32"><tspan
+           sodipodi:role="line"
+           id="tspan32"
+           style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+           x="77.36792"
+           y="58.017895">T5</tspan></text></g><text
+       xml:space="preserve"
+       style="font-size:3.175px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ffffff;fill-opacity:0;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none;stroke-opacity:1"
+       x="17.7791"
+       y="29.107384"
+       id="text33"><tspan
+         sodipodi:role="line"
+         id="tspan33"
+         style="fill:#fff4f5;fill-opacity:0.983294;stroke:#ffffff;stroke-width:0.1;stroke-dasharray:none"
+         x="17.7791"
+         y="29.107384">C</tspan></text></g></svg>
+
+
+
+
+
+
+		 
+		 
+		 
+  <div id="phase-duty-info" style="margin-top:6px;font-size:12px;color:var(--muted);">
+    Phases&nbsp;: 
+    <span id="phaseDutyA">Ta = –</span> · 
+    <span id="phaseDutyB">Tb = –</span> · 
+    <span id="phaseDutyC">Tc = –</span>
+  </div>
+
+
+  
+</div>
+<div style='margin-top:10px;'><canvas id="cvTimeline" height="60"></canvas></div>
+
+
+<section class="panel collapsed" id="panel-svpwm-formulas">
+  <h2 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+    <span>Formules SVPWM — Vref &amp; temps</span>
+    <button id="toggle-svpwm-formulas"
+            class="pill"
+            style="padding:2px 8px;font-size:11px;">
+      Afficher les formules
+    </button>
+  </h2>
+
+  <!-- Contenu des formules (inchangé, juste enveloppé) -->
+  <div id="svpwm-formulas-body"
+     style="font-size: 14px;color:var(--muted);line-height:1.5">
+
+
+
+
+
+  <p style="margin:0 0 6px 0;">
+    À partir de V<sub>&alpha;</sub> et V<sub>&beta;</sub> :
+  </p>
+  <ul style="margin:0 0 8px 14px;padding:0;">
+    <li>
+      |V<sub>ref</sub>| = √(V<sub>&alpha;</sub><sup>2</sup> + V<sub>&beta;</sub><sup>2</sup>)
+      = <b><span id="formulaVref">–</span></b>
+    </li>
+    <li>
+      θ<sub>αβ</sub> = atan2(V<sub>&beta;</sub>, V<sub>&alpha</sub>)
+      = <b><span id="formulaTheta">–</span></b>
+    </li>
+  </ul>
+
+  <p style="margin:4px 0 4px 0;">Indice de modulation :</p>
+  <ul style="margin:0 0 8px 14px;padding:0;">
+    <li>
+      m = |V<sub>ref</sub>| / (V<sub>dc</sub>/√3)
+      = <b><span id="formulaM">–</span></b>
+    </li>
+  </ul>
+
+  <p style="margin:4px 0 4px 0;">
+    Dans le secteur k, avec θ<sub>s</sub> = θ − (k−1)·π/3 :
+  </p>
+  <ul style="margin:0 0 8px 14px;padding:0;">
+    <li>
+      t₁ = T<sub>s</sub> · m · sin(π/3 − θ<sub>s</sub>)
+      = <b><span id="formulaT1">–</span></b>
+    </li>
+    <li>
+      t₂ = T<sub>s</sub> · m · sin(θ<sub>s</sub>)
+      = <b><span id="formulaT2">–</span></b>
+    </li>
+    <li>
+      t₀ = T<sub>s</sub> − t₁ − t₂
+      = <b><span id="formulaT0">–</span></b>
+    </li>
+    <li>t₀/2 utilisé en début et fin de période PWM</li>
+  </ul>
+
+  <p style="margin:4px 0 4px 0;">
+    Exemple secteur 1 (vecteurs 100 puis 110) :
+  </p>
+  <ul style="margin:0 0 0 14px;padding:0;">
+    <li>
+      T<sub>a</sub> = t₀/2 + t₁ + t₂
+      = <b><span id="formulaTa">–</span></b>
+    </li>
+    <li>
+      T<sub>b</sub> = t₀/2 + t₂
+      = <b><span id="formulaTb">–</span></b>
+    </li>
+    <li>
+      T<sub>c</sub> = t₀/2
+      = <b><span id="formulaTc">–</span></b>
+    </li>
+  </ul>
+</div>
+
+
+  <!-- Nouveau : canvas de construction des tensions d’enroulement -->
+  <div style="margin-top:10px;">
+    <canvas id="cvPhasor" height="180"></canvas>
+    <div id="phasor-tooltip" class="phasor-tooltip" style="display:none;"></div>
+
+  </div>
+</section>
+
+</section>
+</div>
+<section class="panel" id="panel-svpwm">
+<h2>SVPWM — hexagone &amp; PWM</h2>
+<div class="row" style="margin-bottom:6px;">
+    <label for="theta">θ</label>
+    <input id="theta" max="180" min="-180" step="5" type="range" value="0"/>
+    <div class="value"><span id="thetaVal">0</span> °</div>
+  </div>
+<div class="row">
+<label for="lock">Suivre ω<sub>élec</sub></label>
+<input checked="" id="lock" type="checkbox"/>
+<span style="font-size: 14px;color:var(--muted)">FOC ON — Id/Iq stabilisés (décoché : <strong>FOC OFF</strong>)</span>
+</div>
+<p style="font-size: 14px;color:var(--muted);margin-bottom:6px">
+          Hexagone SVPWM + vecteur de référence synchronisé avec αβ, plus visualisation qualitative
+          des impulsions PWM et des tensions de phase.
+        </p>
+<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+<label class="pill"><input checked="" id="showAlphaBeta" style="margin-right:4px;" type="checkbox"/>Axes α/β</label>
+<label class="pill" style="display:none;"><input id="showABC" type="checkbox"/>Axes a/b/c</label>
+<!-- currents checkbox removed -->
+<label class="pill"><input checked="" id="showDQ" style="margin-right:4px;" type="checkbox"/>Proj. Id/Iq</label>
+<label class="pill"><input checked="" id="showT" style="margin-right:4px;" type="checkbox"/>Triangle t1/t2</label>
+<label class="pill"><input checked="" id="showAngles" style="margin-right:4px;" type="checkbox"/>Angles</label>
+</div>
+<div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:4px;font-size:11px;">
+<div class="pill">Secteur: <b id="sector">–</b></div>
+<div class="pill">θ<sub>αβ</sub> (°): <b id="angleDeg">0.0</b></div>
+<div class="pill">θ<sub>m</sub> (°): <b id="thetaS">0.0</b></div>
+<div class="pill">t1: <b id="t1">0</b></div>
+<div class="pill">t2: <b id="t2">0</b></div>
+<div class="pill">d1: <b id="d1">0</b></div>
+<div class="pill">d2: <b id="d2">0</b></div>
+<div class="pill">Id: <b id="valD">0</b></div>
+<div class="pill">Iq: <b id="valQ">0</b></div>
+</div>
+<div id="hex-wrap">
+
+<p style="font-size:14px; color:#9ca3af; margin-top:6px;">
+  Le cercle ci-dessous est composé de 200 points, chacun représentant un créneau de 100&nbsp;µs de commande des IGBT 
+  (période PWM = 20&nbsp;ms).  
+  Le point lumineux tourne ici à 1&nbsp;Hz pour visualisation, mais la vitesse réelle est 10&nbsp;000 fois plus rapide.
+</p>
+
+
+
+
+
+
+
+<div id="hex-info"
+     style="
+       margin-top:6px;
+       font-size:12px;
+       color:#e5e7eb;
+       border:1px solid #1f2937;
+       border-radius:8px;
+       padding:6px 8px;
+       background:#020617;
+       display:none;
+     ">
+const infoBox = document.getElementById('hex-info');
+
+function showHexInfo(html){
+  if (!infoBox) return;
+  infoBox.innerHTML = html;
+  infoBox.style.display = 'block';
+}
+
+function hideHexInfo(){
+  if (!infoBox) return;
+  infoBox.style.display = 'none';
+}
+
+	 
+  <!-- Le texte sera rempli en JavaScript -->
+</div>
+
+
+
+
+
+
+
+
+
+
+  <canvas height="260" id="cvHex"></canvas>
+  <button id="playPause" class="hex-play">⏸ Pause</button>
+  <div class="hex-rotor-controls">
+    <label><input type="checkbox" id="showBs" checked> Champ stator</label><br>
+    <span>Rotor :</span>
+    <label class="pill"><input type="radio" name="rotorMode" value="2" checked>2 pôles</label>
+    <label class="pill"><input type="radio" name="rotorMode" value="4">4 pôles</label>
+  </div>
+  <div class="hex-step-controls">
+    <button id="svpwmStepBtn" class="ghost">Pas SVPWM</button>
+    <label class="pill" style="margin-left:8px;">
+      <input type="checkbox" id="svpwmStepMode"> Mode pas-à-pas
+    </label>
+  </div>
+</div>
+<div style="margin-top:10px;">
+  <div id="vref-decomp" style="font-size:13px;color:var(--muted);border:1px solid #1f2937;border-radius:10px;padding:8px 10px;background:#020617;">
+    <div style="font-weight:600;margin-bottom:4px;">Décomposition de V<sub>ref</sub> dans le secteur actif</div>
+    <div id="vrefDecompEq" style="margin-bottom:4px;color:#e5e7eb;">
+      V<sub>ref</sub> = (t1/T<sub>s</sub>)·<span style="color:#3b82f6">V1</span> + (t2/T<sub>s</sub>)·<span style="color:#e11d48">V2</span>
+    </div>
+    <div id="vrefDecompValues" style="font-size:12px;color:#cbd5e1;margin-bottom:4px;">
+      En fonction de θ<sub>αβ</sub>, t1 et t2 sont recalculés en temps réel.
+    </div>
+    <div style="font-size:12px;color:#9ca3af;margin-top:6px;border-top:1px dashed #1f2937;padding-top:6px;">
+      <div style="margin-bottom:2px;">
+        <strong>Séquence fondamentale</strong> (une période PWM T<sub>s</sub>) :
+        <span style="color:#e5e7eb;">V0/7 (t<sub>0</sub>/2) → V1 (t<sub>1</sub>) → V2 (t<sub>2</sub>) → V1 (t<sub>1</sub>) → V0/7 (t<sub>0</sub>/2)</span>
+      </div>
+      <div style="margin-bottom:2px;">
+        Séquence SVPWM : activer le mode pas-à-pas puis cliquer sur «&nbsp;Pas SVPWM&nbsp;» pour dérouler
+        <span style="color:#e5e7eb;">V0/7 → V1 → V2 → V1 → V0/7</span>.
+      </div>
+      <div id="svpwmSeqStep" style="margin-top:2px;color:#e5e7eb;">
+        Étape 1/5 : vecteur nul V0/7 (t<sub>0</sub>/2 au début de la période PWM).
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+</div>
+</main>
+</div>
+<div class="footer">
+  Modélisation d'un ensemble motovariateur: FOC + SynRM
+</div>
+<script>
+
+let phasorAnimSpeed = 0.8;   // vitesse de la petite animation de construction
+
+
+
+// ==== Gestion erreurs JS ====
+window.onerror = function(msg, src, line, col, err){
+  const box = document.getElementById('load-error');
+  if (!box) return;
+  box.style.display='block';
+  box.textContent = 'Erreur JS: ' + msg + '\\n' +
+    (err && err.stack ? err.stack : (src+':'+line+':'+col));
+};
+
+(function(){
+  if (!window.p5){
+    const box=document.getElementById('load-error');
+    if (box){ box.style.display='block'; box.textContent='p5.js introuvable.'; }
+    return;
+  }
+
+  // ==== Etat global unique FOC ====
+  const state = {
+    t: 0,
+    running: true,
+    speedFactor: 1.0,
+
+    markerT: 0,
+
+    svpwmStepMode: false,
+    svpwmStepIndex: 0,
+    svpwmSeqPos: 0,
+
+    freq: 50,     // Hz électrique
+    amp: 1.0,     // amplitude courants
+    imb: 0.0,     // déséquilibre [% -> 0..0.5]
+
+    lock: true,   // suivre ωélec pour Park
+    thetaOff: 0,  // en degrés
+
+    // Params SVPWM (simplifiés pour l'instant)
+    m: 0.8,
+    Vdc: 600
+  };
+
+  let lastFrameTime = performance.now();
+
+  // ==== Modèle math : abc, Clarke, Park ====
+  function simTime(){ return state.t; }
+
+  function modelAt(t){
+    const w = 2*Math.PI*state.freq;
+    const A = state.amp;
+    const imb = state.imb;
+
+    const iaFund = A*Math.sin(w*t);
+    const ibFund = A*Math.sin(w*t - 2*Math.PI/3);
+    const icFund = A*Math.sin(w*t + 2*Math.PI/3);
+
+    const ia = iaFund;
+    const ib = ibFund*(1-imb);
+    const ic = icFund;
+
+    const alpha = (2/3)*( ia - 0.5*ib - 0.5*ic );
+    const beta  = (2/3)*( (Math.sqrt(3)/2) * (ib - ic) );
+    const zero  = (ia + ib + ic)/3;
+
+    const thetaBase = state.lock ? (w*t) : 0;
+    const theta = thetaBase + state.thetaOff*Math.PI/180;
+    const cd=Math.cos(theta), sd=Math.sin(theta);
+    const d = alpha*cd + beta*sd;
+    const q = -alpha*sd + beta*cd;
+
+    return { ia, ib, ic, alpha, beta, zero, d, q, theta };
+  }
+
+  // ==== Sketchs p5 ====
+  function makeABCSketch(p){
+    p.setup = function(){ p.createCanvas(700,250).parent('abc-holder'); };
+    p.draw = function(){
+      const w=p.width,h=p.height,left=50,right=w-10,top=18,bottom=h-28;
+      p.background('#0b0f14'); p.noFill(); p.stroke('#1f2937'); p.rect(left, top, right-left, bottom-top, 10);
+      const t = simTime(); const f=state.freq; const T=f>0?1/f:1; const windowT=2*T; const N=400;
+      function ymap(v){ return p.map(v,-2.2,2.2,bottom,top); }
+      p.stroke('#334155'); p.strokeWeight(1);
+      for(let k=0;k<=4;k++){ const x=p.map(k/4,0,1,left,right); p.line(x,top,x,bottom);} 
+      for(let k=-2;k<=2;k++){ const y=ymap(k); p.line(left,y,right,y);} 
+      let lastA=null,lastB=null,lastC=null;
+      for(let i=0;i<=N;i++){
+        const tt=t - windowT + i/N*windowT; const m=modelAt(tt); const x=p.map(i/N,0,1,left,right);
+        const ya=ymap(m.ia), yb=ymap(m.ib), yc=ymap(m.ic);
+        p.stroke('#ef4444'); p.strokeWeight(2); if(lastA) p.line(lastA.x,lastA.y,x,ya); lastA={x:x,y:ya};
+        p.stroke('#22c55e'); if(lastB) p.line(lastB.x,lastB.y,x,yb); lastB={x:x,y:yb};
+        p.stroke('#3b82f6'); if(lastC) p.line(lastC.x,lastC.y,x,yc); lastC={x:x,y:yc};
+      }
+      const m0=modelAt(t);
+      p.noStroke(); p.fill('#cbd5e1'); p.textSize(9);
+      p.text('a='+m0.ia.toFixed(2)+'  b='+m0.ib.toFixed(2)+'  c='+m0.ic.toFixed(2), left+8, bottom+18);
+    };
+  }
+
+  function makeABSketch(p){
+    p.setup=function(){ p.createCanvas(350,250).parent('ab-holder'); p.pixelDensity(2); };
+    p.draw=function(){
+      const w=p.width,h=p.height; const cx=w/2, cy=h/2+8; const R=Math.min(w,h)*0.36;
+      p.background('#0b0f14'); p.noFill(); p.stroke('#1f2937'); p.strokeWeight(1.5); p.circle(cx,cy,R*2);
+      p.stroke('#334155'); p.line(cx-R-10,cy,cx+R+10,cy); p.line(cx,cy-R-10,cx,cy+R+10);
+      p.noStroke(); p.fill('#94a3b8'); p.textSize(9); p.text('α', cx+R+6, cy+4); p.text('β', cx-10, cy-R-8);
+      const m=modelAt(simTime());
+      p.stroke('#22d3ee'); p.strokeWeight(3);
+      p.line(cx,cy, cx+m.alpha*R, cy - m.beta*R);
+      p.noStroke();     };
+  }
+
+  // ==== SVPWM — hexagone + PWM (corrigé, basé sur fichier SVPWM final) ====
+function initSVPWM(){
+  
+  // Pré-calcul de 200 angles répartis sur 0 → 2π
+const nbSteps = 200;
+const sampleAngles = [];
+for (let i = 0; i < nbSteps; i++){
+    sampleAngles.push(2*Math.PI * (i/nbSteps));
+}
+  
+  
+  const cvHex = document.getElementById('cvHex');
+  const cvPWM = document.getElementById('cvPWM');
+  const cvClarkePark = document.getElementById('cvClarkePark');
+const ctxClarkePark = cvClarkePark ? cvClarkePark.getContext('2d') : null;
+
+  
+  let pwmMouseX = null;
+  if (cvPWM) {
+    cvPWM.addEventListener('mousemove', function(e){
+      const rect = cvPWM.getBoundingClientRect();
+      pwmMouseX = (e.clientX - rect.left) * (cvPWM.width / rect.width);
+    });
+    cvPWM.addEventListener('mouseleave', function(){ pwmMouseX = null; });
+  }
+  const cvOUT = document.getElementById('cvOUT');
+  const cvSwitch = document.getElementById('cvSwitch');
+  const cvTimeline = document.getElementById('cvTimeline');
+  const cvPhasor  = document.getElementById('cvPhasor');
+ 
+  if (!cvHex || !cvPWM || !cvOUT) return;
+
+const ctxHex = cvHex.getContext('2d');
+const ctxPWM = cvPWM.getContext('2d');
+const ctxOUT = cvOUT.getContext('2d');
+const ctxSwitch = cvSwitch ? cvSwitch.getContext('2d') : null;
+const ctxTimeline = cvTimeline ? cvTimeline.getContext('2d') : null;
+const ctxPhasor = cvPhasor ? cvPhasor.getContext('2d') : null;
+
+let phasorLegendBounds = null;
+
+
+  // Tooltip pour le diagramme vectoriel (zone de légende)
+  const phasorTooltip = document.getElementById('phasor-tooltip');
+  if (cvPhasor && phasorTooltip){
+    cvPhasor.addEventListener('mousemove', function(e){
+      if (!phasorLegendBounds) { 
+        phasorTooltip.style.display = 'none';
+        return;
+      }
+      const rect = cvPhasor.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (cvPhasor.width / rect.width);
+      const y = (e.clientY - rect.top) * (cvPhasor.height / rect.height);
+      const b = phasorLegendBounds;
+      const inside = (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+      if (inside){
+        phasorTooltip.style.display = 'block';
+        phasorTooltip.innerHTML = '<b>Note :</b> les vecteurs Va, Vb et Vc sont ici représentés comme trois vecteurs espacés de 120° uniquement pour illustrer la construction géométrique du vecteur de référence Vref dans le SVPWM. Ce n\'est pas une représentation physique directe des tensions de phase.';
+        phasorTooltip.style.left = (rect.left + (b.x + b.w + 8) * (rect.width / cvPhasor.width)) + 'px';
+        phasorTooltip.style.top  = (rect.top  + (b.y - 4) * (rect.height / cvPhasor.height)) + 'px';
+      } else {
+        phasorTooltip.style.display = 'none';
+      }
+    });
+    cvPhasor.addEventListener('mouseleave', function(){
+      phasorTooltip.style.display = 'none';
+    });
+  }
+
+
+  const infoBox = document.getElementById('hex-info');
+
+  function showHexInfo(html){
+    if (!infoBox) return;
+    infoBox.innerHTML = html;
+    infoBox.style.display = 'block';
+  }
+
+  // Clic sur le canvas de l’hexagone / cercle 200 points
+  cvHex.addEventListener('click', function(e){
+    const rect = cvHex.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (cvHex.width / rect.width);
+    const y = (e.clientY - rect.top)  * (cvHex.height / rect.height);
+
+    const w = cvHex.width;
+    const h = cvHex.height;
+    const cx = w/2;
+    const cy = h/2;
+    const R  = Math.min(w,h)*0.35;   // même logique que dans drawSVPWMSteps
+    const Rp = R * 1.08;
+
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.hypot(dx, dy);
+
+    // On ne réagit que si on clique “près” du cercle des 200 points
+    if (dist < Rp - 10 || dist > Rp + 10){
+      return;
+    }
+
+    // Angle dans [0, 2π[
+    let ang = Math.atan2(dy, dx);     // repère canvas (y vers le bas)
+    // le cercle est dessiné avec sin() direct → pas besoin de changer le signe
+    if (ang < 0) ang += 2*Math.PI;
+
+    const nbSteps = 200;
+    const idx = Math.round( (ang / (2*Math.PI)) * nbSteps ) % nbSteps;
+
+    // Quel secteur SVPWM ?
+    const sector = getSectorFromAngle(ang); // déjà définie plus haut :contentReference[oaicite:1]{index=1}
+
+    // Temps correspondant si Ts = 100 µs
+    const Ts = 100e-6;            // 100 µs
+    const t  = idx * Ts;          // en secondes
+    const t_us = t * 1e6;         // en µs
+    const t_ms = t * 1e3;         // en ms
+
+    const html = `
+      Point n° <b>${idx}</b> sur 200<br>
+      → créneau PWM de <b>100&nbsp;µs</b> (Ts)<br>
+      Temps depuis le début de la période&nbsp;: 
+      <b>${t_us.toFixed(0)}&nbsp;µs</b> (${t_ms.toFixed(2)}&nbsp;ms)<br>
+      Secteur SVPWM : <b>S<sub>${sector}</sub></b><br>
+      <span style="color:#9ca3af;">
+        La vitesse de rotation visualisée (1 Hz) est 10&nbsp;000× plus lente
+        que la vraie séquence de commutation.
+      </span>
+    `;
+    showHexInfo(html);
+  });
+
+
+
+
+
+
+
+
+
+
+
+
+const dpr = window.devicePixelRatio || 1;
+  
+  
+const toggleFormulasBtn  = document.getElementById('toggle-svpwm-formulas');
+const svpwmFormulasPanel = document.getElementById('panel-svpwm-formulas');
+
+const svpwmFormulasBody  = document.getElementById('svpwm-formulas-body');
+
+
+if (toggleFormulasBtn && svpwmFormulasPanel && svpwmFormulasBody){
+  toggleFormulasBtn.addEventListener('click', ()=>{
+    const collapsed = svpwmFormulasPanel.classList.toggle('collapsed');
+    toggleFormulasBtn.textContent = collapsed ? 'Afficher les formules'
+                                              : 'Masquer les formules';
+  });
+}
+
+  function resizeSvCanvases(){
+    const cvs = [cvHex, cvPWM, cvOUT, cvSwitch, cvTimeline, cvPhasor];
+    for (const cv of cvs){
+      if (!cv) continue;
+      const rect = cv.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+      cv.width  = rect.width * dpr;
+      cv.height = rect.height * dpr;
+    }
+  }
+  resizeSvCanvases();
+  window.addEventListener('resize', resizeSvCanvases);
+
+
+  const showAlphaBeta = document.getElementById('showAlphaBeta');
+  const showABC       = document.getElementById('showABC');
+  const showCurrents  = document.getElementById('showCurrents');
+  const showDQ        = document.getElementById('showDQ');
+  const showT         = document.getElementById('showT');
+  const showSwitch    = document.getElementById('showSwitch');
+  const showAngles    = document.getElementById('showAngles');
+
+  const sectorEl   = document.getElementById('sector');
+  const angleDegEl = document.getElementById('angleDeg');
+  const thetaSEl   = document.getElementById('thetaS');
+  const t1El       = document.getElementById('t1');
+  const t2El       = document.getElementById('t2');
+  const d1El       = document.getElementById('d1');
+  const d2El       = document.getElementById('d2');
+  const valDEl     = document.getElementById('valD');
+  const valQEl     = document.getElementById('valQ');
+  const formulaTaEl  = document.getElementById("formulaTa");
+const formulaTbEl  = document.getElementById("formulaTb");
+const formulaTcEl  = document.getElementById("formulaTc");
+const formulaT1El  = document.getElementById("formulaT1");
+const formulaT2El  = document.getElementById("formulaT2");
+const formulaT0El  = document.getElementById("formulaT0");
+const formulaVrefEl = document.getElementById("formulaVref");
+const formulaMEl    = document.getElementById("formulaM");
+const formulaThetaEl = document.getElementById("formulaTheta");
+const vrefDecompEqEl = document.getElementById("vrefDecompEq");
+const vrefDecompValuesEl = document.getElementById("vrefDecompValues");
+const svpwmSeqStepEl = document.getElementById("svpwmSeqStep");
+
+
+ const Ts   = 100e-6;
+const Vdc  = state.Vdc;
+const Rhex = Vdc / Math.sqrt(3);  // rayon "physique" (max Vref linéaire)
+const Rref = state.m * Rhex;      // amplitude de référence modulée (m·Vdc/√3)
+
+// Affichage de Ts, fPWM, Vdc, m et Vmax dans le panneau FOC (repère dq)
+const TsFOCEl    = document.getElementById('TsFOC');
+const fPWMFOCEl  = document.getElementById('fPWMFOC');
+const VdcFOCEl   = document.getElementById('VdcFOC');
+const mFOCEl     = document.getElementById('mFOC');
+const VmaxFOCEl  = document.getElementById('VmaxFOC');
+const VrefFOCEl  = document.getElementById('VrefFOC'); // sera mis à jour dans drawHex
+
+if (TsFOCEl)    TsFOCEl.textContent    = (Ts * 1e6).toFixed(1);      // µs
+if (fPWMFOCEl)  fPWMFOCEl.textContent  = (1 / Ts / 1e3).toFixed(1);  // kHz
+if (VdcFOCEl)   VdcFOCEl.textContent   = Vdc.toFixed(0);             // V
+if (mFOCEl)     mFOCEl.textContent     = state.m.toFixed(2);
+if (VmaxFOCEl)  VmaxFOCEl.textContent  = Rref.toFixed(1);            // m·Vdc/√3
+// VrefFOCEl sera mis à jour à chaque frame
+
+
+// --- utilitaires géométrie & SVPWM ---
+
+  function sectorFromAngle(angle){
+    let a = angle % (2*Math.PI);
+    if (a < 0) a += 2*Math.PI;
+    let s = Math.floor(a / (Math.PI/3)) + 1;
+    if (s < 1) s = 1;
+    if (s > 6) s = 6;
+    return s;
+  }
+
+  function svpwmTimes(Valpha, Vbeta){
+    const Vref = Math.hypot(Valpha, Vbeta);
+    if (Vref < 1e-12){
+      return { sector:0, theta_s:0, t1:0, t2:0, t0:Ts, angle:0 };
+    }
+    let angle = Math.atan2(Vbeta, Valpha);
+    if (angle < 0) angle += 2*Math.PI;
+    const sector = sectorFromAngle(angle);
+    const theta_s = angle - (sector-1)*(Math.PI/3);      // angle dans le secteur
+    const k = Math.sqrt(3) * Ts / Vdc;                   // coefficient standard SVPWM
+    const t1 = k * Vref * Math.sin(Math.PI/3 - theta_s);
+    const t2 = k * Vref * Math.sin(theta_s);
+    const tSum = t1 + t2;
+    const t0  = Math.max(0, Ts - tSum);
+    return { sector, theta_s, t1, t2, t0, angle };
+  }
+
+  function onTimes(t1, t2, t0, sector){
+    const t0h = t0/2;
+    let Ta=0,Tb=0,Tc=0;
+    switch(sector){
+      case 1: Ta=t0h+t1+t2;  Tb=t0h+t2;     Tc=t0h;         break;
+      case 2: Ta=t0h+t1;     Tb=t0h+t1+t2; Tc=t0h;         break;
+      case 3: Ta=t0h;        Tb=t0h+t1+t2; Tc=t0h+t2;      break;
+      case 4: Ta=t0h;        Tb=t0h+t1;    Tc=t0h+t1+t2;   break;
+      case 5: Ta=t0h+t2;     Tb=t0h;       Tc=t0h+t1+t2;   break;
+      case 6: Ta=t0h+t1+t2;  Tb=t0h;       Tc=t0h+t1;      break;
+      default: Ta=Tb=Tc=0;
+    }
+    return {Ta,Tb,Tc,t0h};
+  }
+
+  const vectorCodes = ['100','110','010','011','001','101'];
+  function codeFromAngle(angle){
+    let a = angle % (2*Math.PI);
+    if (a < 0) a += 2*Math.PI;
+    const idx = Math.round(a / (Math.PI/3)) % 6;
+    return vectorCodes[idx];
+  }
+
+ // --- dessin hexagone + vecteur αβ + courants + angles ---
+
+
+function drawTimeline(tv, Ts){
+  if (!ctxTimeline || !cvTimeline) return;
+  const w = cvTimeline.width;
+  const h = cvTimeline.height;
+  ctxTimeline.clearRect(0,0,w,h);
+  ctxTimeline.fillStyle = '#020617';
+  ctxTimeline.fillRect(0,0,w,h);
+
+  const padL = 20;
+  const padR = 20;
+  const barTop = h*0.25;      // un peu plus haut pour laisser de la place dessous
+  const barH = 10;
+  const barW = w - padL - padR;
+
+  const t1 = tv.t1;
+  const t2 = tv.t2;
+  const t0 = Math.max(0, Ts - t1 - t2);
+  const total = t0 + t1 + t2 || Ts;
+  const kx = barW / total;
+
+  const x0 = padL;
+  const y0 = barTop;
+
+  // --- barre principale t0/2 – t1 – t2 – t0/2 ---
+
+  let x = x0;
+  const t0half = t0/2;
+  // t0/2 gauche
+  ctxTimeline.fillStyle = '#1f2937';
+  ctxTimeline.fillRect(x, y0, t0half*kx, barH);
+  x += t0half*kx;
+
+  // t1
+  ctxTimeline.fillStyle = '#38bdf8';
+  ctxTimeline.fillRect(x, y0, t1*kx, barH);
+  x += t1*kx;
+
+  // t2
+  ctxTimeline.fillStyle = '#22c55e';
+  ctxTimeline.fillRect(x, y0, t2*kx, barH);
+  x += t2*kx;
+
+  // t0/2 droite
+  ctxTimeline.fillStyle = '#1f2937';
+  ctxTimeline.fillRect(x, y0, t0half*kx, barH);
+
+  // contour
+  ctxTimeline.strokeStyle = '#e5e7eb';
+  ctxTimeline.lineWidth = 1;
+  ctxTimeline.strokeRect(x0, y0, barW, barH);
+
+  // légendes au-dessus de la barre principale
+  ctxTimeline.textAlign = 'center';
+  ctxTimeline.textBaseline = 'bottom';
+
+  // t0/2
+  ctxTimeline.fillStyle = '#9ca3af';
+  ctxTimeline.fillText('t0/2', x0 + (t0half*kx)/2, y0 - 4);
+  // t1
+  ctxTimeline.fillStyle = '#38bdf8';
+  ctxTimeline.fillText('t1', x0 + t0half*kx + (t1*kx)/2, y0 - 4);
+  // t2
+  ctxTimeline.fillStyle = '#22c55e';
+  ctxTimeline.fillText('t2', x0 + t0half*kx + t1*kx + (t2*kx)/2, y0 - 4);
+  // t0/2 droite
+  ctxTimeline.fillStyle = '#9ca3af';
+  ctxTimeline.fillText('t0/2', x, y0 - 4);
+
+  // ===============================
+  //  Ajout : barres Ta / Tb / Tc
+  // ===============================
+  const sector = tv.sector || 0;
+  if (sector >= 1 && sector <= 6 && typeof onTimes === 'function'){
+    const on = onTimes(t1, t2, t0, sector);
+    const Ta = on.Ta;
+    const Tb = on.Tb;
+    const Tc = on.Tc;
+
+    const dutyBarH = 6;
+    const dutyGap  = 4;
+    let yDuty = y0 + barH + 10;   // juste sous la barre principale
+	
+	
+
+
+
+function drawDuty(label, time, color){
+      const frac = Math.max(0, Math.min(1, time / Ts));
+      const wDuty = barW * frac;
+
+      // fond
+      ctxTimeline.fillStyle = 'rgba(15,23,42,0.9)';
+      ctxTimeline.fillRect(x0, yDuty-1, barW, dutyBarH+2);
+
+      // portion conductrice
+      ctxTimeline.fillStyle = color;
+      ctxTimeline.fillRect(x0, yDuty, wDuty, dutyBarH);
+
+      // label à gauche
+      ctxTimeline.textAlign = 'left';
+      ctxTimeline.textBaseline = 'middle';
+      ctxTimeline.font = '11px system-ui';
+      ctxTimeline.fillStyle = color;
+      ctxTimeline.fillText(label, x0 - 18, yDuty + dutyBarH/2);
+
+      // petite valeur numérique à droite (duty)
+      ctxTimeline.textAlign = 'right';
+      ctxTimeline.fillText(frac.toFixed(2), x0 + barW + 40, yDuty + dutyBarH/2);
+
+      yDuty += dutyBarH + dutyGap;
+    }
+
+    drawDuty('Ta', Ta, '#ef4444'); // phase a
+    drawDuty('Tb', Tb, '#22c55e'); // phase b
+    drawDuty('Tc', Tc, '#3b82f6'); // phase c
+
+    // textes Ts, t0, t1, t2 sous les barres masqués (infos déjà dans le panneau formules)
+
+  } else {
+    // cas fallback : on garde juste les textes d'origine
+    ctxTimeline.textAlign = 'left';
+    ctxTimeline.textBaseline = 'alphabetic';
+    const baseY = y0 + barH + 12;
+    ctxTimeline.fillStyle = '#e5e7eb';
+    ctxTimeline.fillText('Ts = ' + (Ts*1e6).toFixed(1) + ' µs', padL, baseY);
+    ctxTimeline.fillText('t0 = ' + (t0*1e6).toFixed(1) + ' µs', padL + 120, baseY);
+    const baseY2 = baseY + 14;
+    ctxTimeline.fillText('t1 = ' + (t1*1e6).toFixed(1) + ' µs', padL, baseY2);
+    ctxTimeline.fillText('t2 = ' + (t2*1e6).toFixed(1) + ' µs', padL + 120, baseY2);
+  }
+}
+
+function drawArrow(ctx, x0, y0, x1, y1, headLen = 10, headAngle = Math.PI/8){
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const ang = Math.atan2(dy, dx);
+
+  // tige
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+
+  // pointe
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(
+    x1 - headLen * Math.cos(ang - headAngle),
+    y1 - headLen * Math.sin(ang - headAngle)
+  );
+  ctx.lineTo(
+    x1 - headLen * Math.cos(ang + headAngle),
+    y1 - headLen * Math.sin(ang + headAngle)
+  );
+  ctx.closePath();
+  ctx.fill();
+}
+
+
+function drawPhasorDiagram(ValphaV, VbetaV, onVals){
+  if (!ctxPhasor || !cvPhasor) return;
+  if (!onVals) return;
+
+  const w  = cvPhasor.width;
+  const h  = cvPhasor.height;
+  const cx = w/2;
+  const cy = h/2 + 6;
+  const r  = Math.min(w,h)*0.40;
+
+  ctxPhasor.clearRect(0,0,w,h);
+  ctxPhasor.fillStyle = '#020617';
+  ctxPhasor.fillRect(0,0,w,h);
+
+// --- Titre de l’oscillogramme dans le canvas ---
+  ctxPhasor.fillStyle   = '#e5e7eb';
+  ctxPhasor.font        = '16px system-ui, sans-serif';
+  ctxPhasor.textAlign   = 'center';
+  ctxPhasor.textBaseline= 'top';
+  ctxPhasor.fillText('Diagramme vectoriel des tensions de phase', w/2, 6);
+
+
+  // Axes α / β
+  ctxPhasor.strokeStyle = '#3a3f4b';
+  ctxPhasor.lineWidth = 1;
+  ctxPhasor.beginPath();
+  ctxPhasor.moveTo(cx-r, cy);
+  ctxPhasor.lineTo(cx+r, cy);
+  ctxPhasor.moveTo(cx, cy-r);
+  ctxPhasor.lineTo(cx, cy+r);
+  ctxPhasor.stroke();
+
+  // Rapports cycliques (Ta, Tb, Tc)
+  const Ta = onVals.Ta;
+  const Tb = onVals.Tb;
+  const Tc = onVals.Tc;
+  const da = Ta / Ts;
+  const db = Tb / Ts;
+  const dc = Tc / Ts;
+
+  const L = r * 1.08*1.2//+20%;
+
+  const vectors = [
+    { name:"Va", color:"#ef4444", len:L*da, ang:0 },
+    { name:"Vb", color:"#22c55e", len:L*db, ang: 2*Math.PI/3 },
+    { name:"Vc", color:"#3b82f6", len:L*dc, ang:-2*Math.PI/3 }
+  ];
+
+  // Dessin de Va, Vb, Vc depuis l’origine (phasors)
+  let sumX = 0, sumY = 0;
+  for (const v of vectors){
+    const vx = v.len * Math.cos(v.ang);
+    const vy = v.len * Math.sin(v.ang);
+    sumX += vx;
+    sumY += vy;
+
+        ctxPhasor.strokeStyle = v.color;
+    ctxPhasor.fillStyle   = v.color;
+    ctxPhasor.lineWidth   = 3;
+    drawArrow(ctxPhasor, cx, cy, cx + vx, cy - vy, 9);
+
+  }
+
+  // Vref (somme) : soit depuis Valpha/Vbeta, soit depuis sumX/sumY (équivalent)
+  const VrefX = sumX;
+  const VrefY = sumY;
+
+    ctxPhasor.strokeStyle = '#ffffff';
+  ctxPhasor.fillStyle   = '#ffffff';
+  ctxPhasor.lineWidth   = 3;
+  drawArrow(ctxPhasor, cx, cy, cx + VrefX, cy - VrefY, 10);
+
+  // --- Petite légende des tensions de phase (en bas à gauche) ---
+  const legendX = 24;
+  const legendY = h - 64;
+  const legendW = 110;
+  const legendH = 60;
+
+  // borne pour le tooltip (en coordonnées canvas)
+  if (typeof phasorLegendBounds !== 'undefined'){
+    phasorLegendBounds = {
+      x: legendX - 8,
+      y: legendY - 10,
+      w: legendW,
+      h: legendH
+    };
+  }
+
+  // fond de la légende
+  ctxPhasor.save();
+  ctxPhasor.fillStyle = 'rgba(15,23,42,0.95)';
+  ctxPhasor.strokeStyle = '#1f2937';
+  ctxPhasor.lineWidth = 1;
+
+  if (ctxPhasor.roundRect) {
+    ctxPhasor.beginPath();
+    ctxPhasor.roundRect(legendX - 8, legendY - 10, legendW, legendH, 8);
+    ctxPhasor.fill();
+    ctxPhasor.stroke();
+  } else {
+    // fallback si roundRect n'existe pas
+    ctxPhasor.fillRect(legendX - 8, legendY - 10, legendW, legendH);
+    ctxPhasor.strokeRect(legendX - 8, legendY - 10, legendW, legendH);
+  }
+
+  const legendItems = [
+    { label: 'Va',   color: '#ef4444' },
+    { label: 'Vb',   color: '#22c55e' },
+    { label: 'Vc',   color: '#3b82f6' },
+    { label: 'Vref', color: '#ffffff' }
+  ];
+
+  ctxPhasor.font = '13px system-ui, sans-serif';
+  ctxPhasor.textAlign = 'left';
+  ctxPhasor.textBaseline = 'middle';
+
+  let ly = legendY;
+  for (const item of legendItems){
+    // petit segment de couleur
+    ctxPhasor.strokeStyle = item.color;
+    ctxPhasor.lineWidth = 2;
+    ctxPhasor.beginPath();
+    ctxPhasor.moveTo(legendX, ly);
+    ctxPhasor.lineTo(legendX + 14, ly);
+    ctxPhasor.stroke();
+
+    // texte
+    ctxPhasor.fillStyle = item.color;
+    ctxPhasor.fillText(item.label, legendX + 20, ly);
+
+    ly += 11;
+  }
+
+  ctxPhasor.restore();
+}
+
+
+function drawSVPWMSteps(angleNow){
+    if (!ctxHex || !cvHex) return;
+
+    const w = cvHex.width;
+    const h = cvHex.height;
+    const cx = w/2;
+    const cy = h/2;
+    const R = Math.min(w, h)*0.35;
+
+    // Rayon pour les points de la timeline
+    const Rp = R * 1.08;
+
+    ctxHex.save();
+
+    // Petit halo autour de l’angle courant
+    const xCurrent = cx + Rp * Math.cos(angleNow);
+    const yCurrent = cy + Rp * Math.sin(angleNow);
+
+    ctxHex.fillStyle = 'rgba(255,255,255,0.20)';
+    ctxHex.beginPath();
+    ctxHex.arc(xCurrent, yCurrent, 12, 0, 2*Math.PI);
+    ctxHex.fill();
+
+    // Dessin des 200 points
+    for (let k = 0; k < sampleAngles.length; k++){
+        const a = sampleAngles[k];
+        const x = cx + Rp * Math.cos(a);
+        const y = cy + Rp * Math.sin(a);
+
+        // couleur selon le secteur
+        const sector = getSectorFromAngle(a);
+
+        const colors = [
+            null,
+            '#3b82f6', // S1
+            '#22c55e', // S2
+            '#eab308', // S3
+            '#ef4444', // S4
+            '#a855f7', // S5
+            '#0ea5e9'  // S6
+        ];
+
+        ctxHex.fillStyle = colors[sector] + 'AA'; // léger alpha
+
+        ctxHex.beginPath();
+        ctxHex.arc(x, y, 3, 0, 2*Math.PI);
+        ctxHex.fill();
+    }
+
+    // point courant (échantillon actif)
+    ctxHex.fillStyle = '#ffffff';
+    ctxHex.beginPath();
+    ctxHex.arc(xCurrent, yCurrent, 4.5, 0, 2*Math.PI);
+    ctxHex.fill();
+
+    ctxHex.restore();
+	
+}function drawClarkePark(){
+  if (!ctxClarkePark || !cvClarkePark) return;
+
+  const w  = cvClarkePark.width;
+  const h  = cvClarkePark.height;
+
+  // centres des deux cercles
+  const cxL = w * 0.27;   // gauche : Clarke (αβ)
+  const cxR = w * 0.73;   // droite : Park (dq)
+  const cy  = h / 2 + 2;  // légèrement remonté pour laisser de la place en bas
+  const R   = Math.min(w / 2 - 40, h * 0.35);
+
+  // fond
+  ctxClarkePark.clearRect(0,0,w,h);
+  ctxClarkePark.fillStyle = '#020617';
+  ctxClarkePark.fillRect(0,0,w,h);
+
+  // titre
+  ctxClarkePark.fillStyle    = '#e5e7eb';
+  ctxClarkePark.font         = '12px system-ui, sans-serif';
+  ctxClarkePark.textAlign    = 'center';
+  ctxClarkePark.textBaseline = 'top';
+  ctxClarkePark.fillText('Clarke \u2192 Park — repères \u03b1\u03b2 et dq', w/2, 6);
+
+  // modèle courant (alpha,beta,d,q,theta) au temps de simulation global
+  const m      = modelAt(simTime());
+  const alpha  = m.alpha;
+  const beta   = m.beta;
+  const d      = m.d;
+  const q      = m.q;
+  const theta  = m.theta;   // angle électrique : repère dq
+
+  // échelle
+  const A      = state.amp || 1;
+  const scale  = R / (2 * Math.max(A, 0.2));
+
+  const vx = alpha * scale;
+  const vy = beta  * scale;
+
+  // petite fonction flèche
+  function drawArrow(ctx, x0,y0, x1,y1, head){
+    const dx = x1-x0, dy = y1-y0;
+    const L  = Math.hypot(dx,dy) || 1;
+    const ux = dx/L,  uy = dy/L;
+
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - head*ux + 0.5*head*uy, y1 - head*uy - 0.5*head*ux);
+    ctx.lineTo(x1 - head*ux - 0.5*head*uy, y1 - head*uy + 0.5*head*ux);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // -------------------------------------------------
+  // 1) Cercle gauche : Clarke (repère αβ fixe)
+  // -------------------------------------------------
+  ctxClarkePark.save();
+  ctxClarkePark.translate(cxL, cy);
+
+  // cercle
+  ctxClarkePark.strokeStyle = '#1f2937';
+  ctxClarkePark.lineWidth   = 1;
+  ctxClarkePark.beginPath();
+  ctxClarkePark.arc(0, 0, R, 0, 2*Math.PI);
+  ctxClarkePark.stroke();
+
+  // axes α / β
+  ctxClarkePark.strokeStyle = '#334155';
+  ctxClarkePark.beginPath();
+  ctxClarkePark.moveTo(-R, 0);
+  ctxClarkePark.lineTo( R, 0);
+  ctxClarkePark.moveTo(0, -R);
+  ctxClarkePark.lineTo(0,  R);
+  ctxClarkePark.stroke();
+
+  // labels α, β
+  ctxClarkePark.fillStyle = '#64748b';
+  ctxClarkePark.font      = '11px system-ui, sans-serif';
+  ctxClarkePark.textAlign = 'right';
+  ctxClarkePark.fillText('\u03b1', R + 14, -2);
+  ctxClarkePark.textAlign = 'center';
+  ctxClarkePark.fillText('\u03b2', -10, -R - 10);
+
+  // vecteur courant dans αβ
+  ctxClarkePark.strokeStyle = '#38bdf8';
+  ctxClarkePark.fillStyle   = '#38bdf8';
+  ctxClarkePark.lineWidth   = 3;
+  drawArrow(ctxClarkePark, 0, 0, vx, -vy, 8);
+
+  // sous-titre
+  ctxClarkePark.fillStyle    = '#e5e7eb';
+  ctxClarkePark.font         = '11px system-ui, sans-serif';
+  ctxClarkePark.textAlign    = 'center';
+  ctxClarkePark.textBaseline = 'top';
+  ctxClarkePark.fillText('Clarke : repère \u03b1\u03b2 fixe', 0, R + 8);
+
+  ctxClarkePark.restore();
+
+  // -------------------------------------------------
+  // 2) Cercle droite : Park (repère dq tournant)
+  // -------------------------------------------------
+  ctxClarkePark.save();
+  ctxClarkePark.translate(cxR, cy);
+
+  // cercle
+  ctxClarkePark.strokeStyle = '#1f2937';
+  ctxClarkePark.lineWidth   = 1;
+  ctxClarkePark.beginPath();
+  ctxClarkePark.arc(0, 0, R, 0, 2*Math.PI);
+  ctxClarkePark.stroke();
+
+  // vecteurs unitaires des axes d et q en COORDONNÉES CANVAS
+  // (on part des vecteurs mathématiques et on tient compte du Y inversé)
+  const cd = Math.cos(theta);
+  const sd = Math.sin(theta);
+
+  const ux_d =  cd;   // axe d : direction +d
+  const uy_d = -sd;
+
+  const ux_q = -sd;   // axe q : direction +q (en avance de 90°)
+  const uy_q = -cd;
+
+  const Raxis = R * 1.0;
+
+  // axe d (flux) en orange
+  ctxClarkePark.strokeStyle = '#f97316';
+  ctxClarkePark.lineWidth   = 2;
+  ctxClarkePark.beginPath();
+  ctxClarkePark.moveTo(-Raxis*ux_d, -Raxis*uy_d);
+  ctxClarkePark.lineTo( Raxis*ux_d,  Raxis*uy_d);
+  ctxClarkePark.stroke();
+
+  // axe q (couple) en violet
+  ctxClarkePark.strokeStyle = '#a855f7';
+  ctxClarkePark.beginPath();
+  ctxClarkePark.moveTo(-Raxis*ux_q, -Raxis*uy_q);
+  ctxClarkePark.lineTo( Raxis*ux_q,  Raxis*uy_q);
+  ctxClarkePark.stroke();
+
+  // labels d, q sur les directions positives
+  ctxClarkePark.fillStyle = '#fbbf24';
+  ctxClarkePark.font      = '11px system-ui, sans-serif';
+  ctxClarkePark.textAlign = 'center';
+  ctxClarkePark.fillText('d',  Raxis*ux_d*1.05,  Raxis*uy_d*1.05);
+
+  ctxClarkePark.fillStyle = '#c4b5fd';
+  ctxClarkePark.fillText('q',  Raxis*ux_q*1.05,  Raxis*uy_q*1.05);
+
+  // vecteur courant dans le plan statorique (même que gauche)
+  ctxClarkePark.strokeStyle = '#38bdf8';
+  ctxClarkePark.fillStyle   = '#38bdf8';
+  ctxClarkePark.lineWidth   = 3;
+  drawArrow(ctxClarkePark, 0, 0, vx, -vy, 8);
+
+  // --- Projections Id et Iq sur les axes d et q ---
+  const dLen = d * scale;
+  const qLen = q * scale;
+
+  // composante Id le long de +d
+  const dx = dLen * ux_d;
+  const dy = dLen * uy_d;
+
+  ctxClarkePark.strokeStyle = '#fed7aa';   // orange clair
+  ctxClarkePark.lineWidth   = 2;
+  ctxClarkePark.beginPath();
+  ctxClarkePark.moveTo(0, 0);
+  ctxClarkePark.lineTo(dx, dy);
+  ctxClarkePark.stroke();
+
+  // composante Iq le long de +q
+  const qx = qLen * ux_q;
+  const qy = qLen * uy_q;
+
+  ctxClarkePark.strokeStyle = '#e9d5ff';   // violet clair
+  ctxClarkePark.beginPath();
+  ctxClarkePark.moveTo(0, 0);
+  ctxClarkePark.lineTo(qx, qy);
+  ctxClarkePark.stroke();
+
+  // labels Id et Iq près des extrémités des projections
+  ctxClarkePark.font      = '11px system-ui, sans-serif';
+  ctxClarkePark.textAlign = 'center';
+
+  ctxClarkePark.fillStyle = '#fed7aa';
+  ctxClarkePark.fillText('Id', dx * 1.15, dy * 1.15);
+
+  ctxClarkePark.fillStyle = '#e9d5ff';
+  ctxClarkePark.fillText('Iq', qx * 1.15, qy * 1.15);
+
+  // sous-titre sous le cercle Park
+  ctxClarkePark.fillStyle    = '#e5e7eb';
+  ctxClarkePark.font         = '11px system-ui, sans-serif';
+  ctxClarkePark.textAlign    = 'center';
+  ctxClarkePark.textBaseline = 'top';
+  ctxClarkePark.fillText('Park : repère dq tournant', 0, R + 8);
+
+  ctxClarkePark.restore();
+
+  // 👉 plus de bandeau Id/Iq en bas : on l'a retiré pour que le panneau reste épuré
+}
+
+
+
+
+
+
+
+
+
+
+function getSectorFromAngle(a){
+    a = (a + 2*Math.PI) % (2*Math.PI); // normalisation 0 → 2π
+    const sector = Math.floor(a / (Math.PI/3)) + 1;
+    return Math.min(6, Math.max(1, sector));
+}
+
+
+
+
+
+
+
+
+// Centre du rotor SynRM (calculé une seule fois)
+let synrmCenter = null;
+
+function getSynrmCenter() {
+  if (synrmCenter) return synrmCenter;
+
+  const ellipse = document.getElementById('path104'); // ellipse du rotor
+  if (ellipse) {
+    synrmCenter = {
+      cx: parseFloat(ellipse.getAttribute('cx')),
+      cy: parseFloat(ellipse.getAttribute('cy')),
+    };
+  } else {
+    // secours si jamais l'ellipse change de nom
+    const rotor = document.getElementById('synrmRotorFOC');
+    if (!rotor) return null;
+    const bbox = rotor.getBBox();
+    synrmCenter = {
+      cx: bbox.x + bbox.width / 2,
+      cy: bbox.y + bbox.height / 2,
+    };
+  }
+  return synrmCenter;
+}
+
+function updateSynrmRotor(angleElec){
+  const rotor = document.getElementById('synrmRotorFOC');
+  if (!rotor) return;
+
+  const center = getSynrmCenter();
+  if (!center) return;
+
+  // 4 pôles → 2 paires
+  const polePairs = 2;
+  const angleMech = angleElec / polePairs;      // rad
+  const angleDeg  = angleMech * 180 / Math.PI;  // degrés
+
+  // Rotation autour d’un centre FIXE
+  rotor.setAttribute(
+    'transform',
+    'rotate(' + angleDeg + ' ' + center.cx + ' ' + center.cy + ')'
+  );
+}
+
+
+function drawHex(){
+  const w = cvHex.width;
+  const h = cvHex.height;
+  const cx = w/2;
+  const cy = h/2 + 10;
+  const r  = Math.min(w,h)*0.32;   // rayon graphique
+
+  ctxHex.clearRect(0,0,w,h);
+  ctxHex.fillStyle = '#020617';
+  ctxHex.fillRect(0,0,w,h);
+
+
+
+// Angle réel du vecteur Valpha/Vbeta
+//const angleNow = Math.atan2(VbetaV, ValphaV);
+
+// Dessin des 200 tranches
+//drawSVPWMSteps(angleNow);
+
+
+
+
+
+
+  if (ctxSwitch && cvSwitch){
+    const wS = cvSwitch.width;
+    const hS = cvSwitch.height;
+    ctxSwitch.clearRect(0,0,wS,hS);
+    ctxSwitch.fillStyle = '#020617';
+    ctxSwitch.fillRect(0,0,wS,hS);
+  }
+
+  // modèle à l’instant courant → α,β, d, q, θ
+  const m = modelAt(simTime());
+  const Valpha = m.alpha;
+  const Vbeta  = m.beta;
+  const theta_e = m.theta; // angle électrique utilisé pour Park
+
+  // mise à jour du rotor SynRM dans le variateur
+  updateSynrmRotor(theta_e);
+
+  // mise à l’échelle : on rattache αβ (en u.a.) à Rref (volts)
+  const maxAmp = Math.max(0.1, state.amp*1.4);
+  const kVolt  = Rref / maxAmp;           // α,β → volts pour SVPWM
+  const ValphaV = Valpha * kVolt;
+  const VbetaV  = Vbeta  * kVolt;
+
+// magnitude instantanée de Vref (en volts réels, dans le plan αβ)
+const VrefMag = Math.hypot(ValphaV, VbetaV);
+if (VrefFOCEl) {
+  VrefFOCEl.textContent = VrefMag.toFixed(1);
+}
+if (formulaVrefEl) {
+  formulaVrefEl.textContent = VrefMag.toFixed(1) + ' V';
+}
+if (formulaMEl) {
+  formulaMEl.textContent = state.m.toFixed(2);
+}
+
+    const tv      = svpwmTimes(ValphaV, VbetaV);
+  drawTimeline(tv, Ts);
+  const sector  = tv.sector;
+  const theta_s = tv.theta_s;
+  const angle   = tv.angle;               // angle du vecteur dans αβ
+
+  // Texte : Vref = t1/Ts·V1 + t2/Ts·V2 avec valeurs numériques
+  if (vrefDecompEqEl && vrefDecompValuesEl){
+    if (sector >= 1 && sector <= 6 && tv.t1 > 0 && tv.t2 > 0){
+      const a1 = tv.t1 / Ts;
+      const a2 = tv.t2 / Ts;
+      const s1 = sector;
+      const s2 = (sector % 6) + 1;
+
+      vrefDecompEqEl.innerHTML =
+        'V<sub>ref</sub> = (t1/T<sub>s</sub>)·<span style="color:#3b82f6">V<sub>' + s1 +
+        '</sub></span> + (t2/T<sub>s</sub>)·<span style="color:#e11d48">V<sub>' + s2 + '</sub></span>';
+
+      vrefDecompValuesEl.innerHTML =
+        't1/T<sub>s</sub> ≈ ' + a1.toFixed(3) +
+        ', t2/T<sub>s</sub> ≈ ' + a2.toFixed(3) +
+        '  →  V<sub>ref</sub> = ' +
+        a1.toFixed(3) + '·V<sub>' + s1 + '</sub> + ' +
+        a2.toFixed(3) + '·V<sub>' + s2 + '</sub>';
+    } else {
+      vrefDecompEqEl.innerHTML =
+        'V<sub>ref</sub> = (t1/T<sub>s</sub>)·<span style="color:#3b82f6">V1</span> + (t2/T<sub>s</sub>)·<span style="color:#e11d48">V2</span>';
+      vrefDecompValuesEl.innerHTML =
+        'Vecteur de référence nul : t1 = t2 = 0';
+    }
+  }
+
+  
+  // Texte dynamique de la séquence fondamentale SVPWM (5 étapes)
+  if (svpwmSeqStepEl){
+    if (!(sector >= 1 && sector <= 6 && tv.t1 > 0 && tv.t2 > 0)){
+      svpwmSeqStepEl.innerHTML =
+        "Séquence SVPWM non définie : V<sub>ref</sub> est nul ou en dehors de l'hexagone.";
+
+    } else {
+      const vecCodes = ['', '100','110','010','011','001','101'];
+      const v1Index = sector;
+      const v2Index = (sector % 6) + 1;
+      const v1Code  = vecCodes[v1Index];
+      const v2Code  = vecCodes[v2Index];
+
+      const step = (state.svpwmSeqPos || 0) % 5;
+      const stepNum = step + 1;
+      let label, code, extra;
+
+      if (step === 0 || step === 4){
+        label = 'V0/7';
+        code  = '000 / 111';
+        extra = ' (vecteur nul : toutes les phases à 0 ou à +V<sub>dc</sub>)';
+      } else if (step === 1 || step === 3){
+        label = 'V' + v1Index;
+        code  = v1Code;
+      } else { // step === 2
+        label = 'V' + v2Index;
+        code  = v2Code;
+      }
+
+      let signs = '';
+      if (code.length === 3){
+        const labels = ['A','B','C'];
+        const parts = [];
+        for (let i = 0; i < 3; i++){
+          const c = code[i];
+          const sgn = (c === '1') ? '+' : '−';
+          parts.push(labels[i] + ' = ' + sgn);
+        }
+        signs = ' (' + parts.join(', ') + ')';
+      } else if (!extra){
+        extra = '';
+      }
+
+      svpwmSeqStepEl.innerHTML =
+        'Étape ' + stepNum + '/5 : vecteur actif <span style="color:#e5e7eb;">' + label +
+        '</span> = <span style="color:#e5e7eb;">' + code + '</span>' +
+        (signs || '') + (extra || '') +
+        ', secteur S<sub>' + sector + '</sub>.';
+    }
+  }
+
+// --- point "PWM" et curseur : 1 Hz en continu OU pas-à-pas SVPWM ---
+  //     échantillonnage calé sur les 200 instants de Vref (1/200 de période)
+  const fMarker = 1; // Hz
+  let idx200;
+  if (state.svpwmStepMode){
+    idx200 = (state.svpwmStepIndex || 0) % 200;
+  } else {
+    const markerT = state.markerT || 0;
+    const markerPhase = (markerT * fMarker) % 1;
+    idx200 = Math.floor(markerPhase * 200) % 200;
+    state.svpwmStepIndex = idx200;
+  }
+  const phase200 = idx200 / 200;
+  const anglePWM = 2 * Math.PI * phase200;
+
+  // Tracé des 200 tranches autour de l’hexagone (points colorés fixes)
+  drawSVPWMSteps(anglePWM);
+
+
+  
+  let onVals = null;
+if (typeof onTimes === 'function' && tv.sector >= 1 && tv.sector <= 6){
+    onVals = onTimes(tv.t1, tv.t2, tv.t0, tv.sector);
+    if (formulaTaEl) formulaTaEl.textContent = (onVals.Ta*1e6).toFixed(2) + ' µs';
+    if (formulaTbEl) formulaTbEl.textContent = (onVals.Tb*1e6).toFixed(2) + ' µs';
+    if (formulaTcEl) formulaTcEl.textContent = (onVals.Tc*1e6).toFixed(2) + ' µs';
+}
+
+
+  // --- nouveau : diagramme vectoriel des tensions d’enroulements ---
+  drawPhasorDiagram(ValphaV, VbetaV, onVals);
+
+
+// --- Mise en évidence des IGBT basée sur les états logiques Sa / Sb / Sc ---
+{
+  const igbtA_top = document.getElementById('igbt_A_top');
+  const igbtA_bot = document.getElementById('igbt_A_bot');
+  const igbtB_top = document.getElementById('igbt_B_top');
+  const igbtB_bot = document.getElementById('igbt_B_bot');
+  const igbtC_top = document.getElementById('igbt_C_top');
+  const igbtC_bot = document.getElementById('igbt_C_bot');
+
+  // T1..T6 = IGBT du variateur (U, V, W)
+  const T1 = document.getElementById('igbt_T1'); // U haut (phase A)
+  const T2 = document.getElementById('igbt_T2'); // U bas  (phase A)
+  const T3 = document.getElementById('igbt_T3'); // V haut (phase B)
+  const T4 = document.getElementById('igbt_T4'); // V bas  (phase B)
+  const T5 = document.getElementById('igbt_T5'); // W haut (phase C)
+  const T6 = document.getElementById('igbt_T6'); // W bas  (phase C)
+
+  const all = [
+    igbtA_top, igbtA_bot,
+    igbtB_top, igbtB_bot,
+    igbtC_top, igbtC_bot,
+    T1, T2, T3, T4, T5, T6
+  ];
+
+/// --- Mise en évidence des DIODES du redresseur ---
+{
+  // IDs EXACTEMENT comme dans le SVG : D1…D6
+  const D1 = document.getElementById('D1');
+  const D2 = document.getElementById('D2');
+  const D3 = document.getElementById('D3');
+  const D4 = document.getElementById('D4');
+  const D5 = document.getElementById('D5');
+  const D6 = document.getElementById('D6');
+
+  const diodes = [D1, D2, D3, D4, D5, D6];
+
+  // reset : toutes OFF
+  diodes.forEach(d => {
+    if (!d) return;
+    d.classList.remove('diode-on', 'diode-off');
+    d.classList.add('diode-off');
+  });
+
+  // angle électrique réseau (en degrés, 0..360)
+  let angDeg = angle * 180 / Math.PI;
+  angDeg = ((angDeg % 360) + 360) % 360;
+
+  const k = Math.floor(angDeg / 60);   // 0..5
+
+  // 2 diodes conductrices, jamais les deux d'un même bras
+  const table = [
+    [D1, D4], // 0–60°  : U+ (D1) & V- (D4)
+    [D1, D6], // 60–120°: U+ (D1) & W- (D6)
+    [D3, D6], // 120–180°: V+ (D3) & W- (D6)
+    [D3, D2], // 180–240°: V+ (D3) & U- (D2)
+    [D5, D2], // 240–300°: W+ (D5) & U- (D2)
+    [D5, D4]  // 300–360°: W+ (D5) & V- (D4)
+  ];
+
+  const pair = table[k] || [];
+  pair.forEach(d => {
+    if (!d) return;
+    d.classList.remove('diode-off');
+    d.classList.add('diode-on');
+  });
+}
+
+// --- Condensateur bus DC : conduction réaliste + luminosité continue ---
+{
+  const cap = document.getElementById("dc_capacitor");
+  if (!cap) return;
+
+  // reset des classes de couleur
+  cap.classList.remove("cap-strong", "cap-weak");
+
+  // angle électrique en degrés 0..360
+  let angDeg = angle * 180 / Math.PI;
+  angDeg = ((angDeg % 360) + 360) % 360;
+
+  // angle local dans le secteur de 60° en cours : 0..60
+  const local = angDeg % 60;
+
+  // --- 1) logique "réaliste" de conduction : pulses courts autour des crêtes ---
+  const inChargePulse = local < 20;   // largeur de la zone de conduction (en degrés)
+
+  if (inChargePulse) {
+    cap.classList.add("cap-strong");   // orange = conduction du pont
+  } else {
+    cap.classList.add("cap-weak");     // bleu = pas de conduction
+  }
+
+  // --- 2) modulation continue de luminosité (pseudo ripple du bus DC) ---
+  // ondulation à 6 fois la fréquence réseau (sortie 0..1)
+  const rippleRaw = 0.5 * (1 + Math.cos(6 * angle));
+
+  // profondeur de modulation : entre 0.6 et 1.0 → à ajuster
+  const minB = 1.7;   // luminosité mini
+  const maxB = 2;   // luminosité maxi
+  const brightness = minB + (maxB - minB) * rippleRaw;
+
+  // on joue sur le filtre CSS (les classes cap-strong / cap-weak gèrent la couleur)
+  cap.style.filter = `brightness(${brightness.toFixed(2)})`;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+  for (const el of all){
+    if (!el) continue;
+    el.classList.remove('igbt-on-high','igbt-on-low','igbt-off');
+    el.classList.add('igbt-off'); // neutre = OFF
+  }
+
+  // Récupère le code SaSbSc associé au secteur courant
+  let code = (sector >= 1 && sector <= 6) ? vectorCodes[sector-1] : '000';
+
+  const Sa = code[0] === '1';
+  const Sb = code[1] === '1';
+  const Sc = code[2] === '1';
+  inverterSwitch = {Sa, Sb, Sc};
+
+
+  function applyPhaseFromState(S, topEl, botEl, extraTopEls = [], extraBotEls = []){
+    const tops = [topEl, ...extraTopEls].filter(Boolean);
+    const bots = [botEl, ...extraBotEls].filter(Boolean);
+
+    for (const el of [...tops, ...bots]){
+      el.classList.remove('igbt-on-high','igbt-on-low','igbt-off');
+    }
+
+    if (S){
+      // haut ON
+      tops.forEach(el => el.classList.add('igbt-on-high'));
+      bots.forEach(el => el.classList.add('igbt-off'));
+    } else {
+      // bas ON
+      tops.forEach(el => el.classList.add('igbt-off'));
+      bots.forEach(el => el.classList.add('igbt-on-low'));
+    }
+  }
+
+  // Phase U : T1 bas et T2 haut (selon ton schéma réel)
+applyPhaseFromState(Sa, igbtA_top, igbtA_bot, [T2], [T1]);
+
+// Phase V : T3 bas et T4 haut
+applyPhaseFromState(Sb, igbtB_top, igbtB_bot, [T4], [T3]);
+
+// Phase W : T5 bas et T6 haut
+applyPhaseFromState(Sc, igbtC_top, igbtC_bot, [T6], [T5]);
+
+}
+
+// --- Mise en évidence des DIODES du redresseur ---
+{
+  
+
+ //const diodes = [D1, D2, D3, D4, D5, D6];
+
+  // Tout le monde OFF au départ
+  //diodes.forEach(d => {
+  //  if (!d) return;
+   // d.classList.remove('diode-on', 'diode-off');
+   // d.classList.add('diode-off');
+  //});
+
+  // On utilise ton angle (en radians) pour balayer 0..360°
+ // let angDeg = angle * 180 / Math.PI;
+//  angDeg = ((angDeg % 360) + 360) % 360; // normalise dans 0..360
+
+ // const secteur = Math.floor(angDeg / 60); // 0..5
+
+  // Tableau des 2 diodes conductrices par secteur (ordre à ajuster à ton pont)
+//  const table = [
+  //  [D1, D6], // secteur 0 : 0–60°
+    //[D1, D2], // secteur 1 : 60–120°
+   // [D3, D2], // secteur 2 : 120–180°
+   // [D3, D4], // secteur 3 : 180–240°
+   // [D5, D4], // secteur 4 : 240–300°
+   // [D5, D6]  // secteur 5 : 300–360°
+ // ];
+
+ // const pair = table[secteur];
+ // if (pair) {
+   // pair.forEach(d => {
+   //   if (!d) return;
+    //  d.classList.remove('diode-off');
+   //   d.classList.add('diode-on');
+   // });
+ // }
+}
+
+
+
+// --- Animation des enroulements U / V / W ---
+{
+  const Eu = document.getElementById("Enr_1");
+  const Ev = document.getElementById("Enr_2");
+  const Ew = document.getElementById("Enr_3");
+
+  // valeurs instantanées du courant (déjà calculées dans ton modèle)
+const ia = m.ia;
+const ib = m.ib;
+const ic = m.ic;
+
+
+  function colorCoil(el, I) {
+    if (!el) return;
+
+    el.classList.remove("coil-pos", "coil-neg", "coil-zero");
+
+    if (Math.abs(I) < 0.01) {
+      el.classList.add("coil-zero");
+    } else if (I > 0) {
+      el.classList.add("coil-pos");   // courant sortant du pont
+    } else {
+      el.classList.add("coil-neg");   // courant entrant dans le pont
+    }
+  }
+
+ colorCoil(Eu, ia);
+colorCoil(Ev, ib);
+colorCoil(Ew, ic);
+
+}
+
+
+  // mise à jour des petites pastilles d’info
+  const aDeg = ((angle*180/Math.PI)%360+360)%360;
+  if (sectorEl)   sectorEl.textContent   = sector || '–';
+  if (angleDegEl) angleDegEl.textContent = aDeg.toFixed(1);
+  if (thetaSEl)   thetaSEl.textContent   = (theta_s*180/Math.PI).toFixed(1);
+  if (formulaThetaEl) formulaThetaEl.textContent = aDeg.toFixed(1) + ' °';
+  if (t1El)       t1El.textContent       = (tv.t1*1e6).toFixed(2)+' µs';
+  if (t2El)       t2El.textContent       = (tv.t2*1e6).toFixed(2)+' µs';
+  if (d1El)       d1El.textContent       = (tv.t1/Ts).toFixed(3);
+  if (d2El)       d2El.textContent       = (tv.t2/Ts).toFixed(3);
+  if (valDEl)     valDEl.textContent     = m.d.toFixed(3);
+  if (valQEl)     valQEl.textContent     = m.q.toFixed(3);
+
+
+  // Mise à jour des valeurs numériques dans le panneau de formules
+  if (formulaT1El) formulaT1El.textContent = (tv.t1*1e6).toFixed(2) + ' µs';
+  if (formulaT2El) formulaT2El.textContent = (tv.t2*1e6).toFixed(2) + ' µs';
+  if (formulaT0El) formulaT0El.textContent = (tv.t0*1e6).toFixed(2) + ' µs';
+
+  if (typeof onTimes === 'function' && tv.sector >= 1 && tv.sector <= 6){
+    onVals = onTimes(tv.t1, tv.t2, tv.t0, tv.sector);
+    if (formulaTaEl) formulaTaEl.textContent = (onVals.Ta*1e6).toFixed(2) + ' µs';
+    if (formulaTbEl) formulaTbEl.textContent = (onVals.Tb*1e6).toFixed(2) + ' µs';
+    if (formulaTcEl) formulaTcEl.textContent = (onVals.Tc*1e6).toFixed(2) + ' µs';
+  }
+
+  // code binaire SaSbSc affiché près de l'onduleur
+  if (typeof inverterCodeEl !== 'undefined' && inverterCodeEl){
+    const code = (sector >= 1 && sector <= 6) ? vectorCodes[sector-1] : '000';
+    inverterCodeEl.textContent = code;
+  }
+
+  // --- hexagone SVPWM ---
+  ctxHex.strokeStyle = '#1f2937';
+  ctxHex.lineWidth = 4;
+  ctxHex.beginPath();
+  for(let k=0;k<6;k++){
+    const ang = Math.PI/6 + k*Math.PI/3;
+    const x = cx + r*Math.cos(ang);
+    const y = cy - r*Math.sin(ang);
+    if (k===0) ctxHex.moveTo(x,y); else ctxHex.lineTo(x,y);
+  }
+  ctxHex.closePath();
+  ctxHex.stroke();
+
+
+
+
+  // wedge du secteur courant
+  if (sector >= 1 && sector <= 6){
+    const s0 = (sector-1)*Math.PI/3;
+    const s1 = sector*Math.PI/3;
+    ctxHex.save();
+    ctxHex.fillStyle = 'rgba(90,169,230,0.15)';
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx,cy);
+    ctxHex.arc(cx,cy,r, -s0, -s1, true);
+    ctxHex.closePath();
+    ctxHex.fill();
+    ctxHex.restore();
+  // barres de conduction des transistors (temps ON des phases a/b/c)
+  if (!showSwitch || showSwitch.checked){
+    const on = onTimes(tv.t1, tv.t2, tv.t0, sector);
+    const Ta = on.Ta / Ts;
+    const Tb = on.Tb / Ts;
+    const Tc = on.Tc / Ts;
+    if (typeof inverterConduction !== 'undefined') inverterConduction = {Ta, Tb, Tc};
+
+    if (typeof updateInverterFromState === 'function') updateInverterFromState();
+
+    if (ctxSwitch && cvSwitch){
+      const wS = cvSwitch.width;
+      const hS = cvSwitch.height;
+      const barMax = wS * 0.7;
+      const barH = 8 * dpr;
+      const baseX = (wS - barMax) / 2;
+      let yBar = hS * 0.30;
+
+      function drawBarSwitch(frac, color, label){
+        const fracClamped = Math.max(0, Math.min(1, frac));
+        const wBar = barMax * fracClamped;
+
+        // fond discret
+        ctxSwitch.fillStyle = 'rgba(15,23,42,0.9)';
+        ctxSwitch.fillRect(baseX, yBar-1, barMax, barH+2);
+
+        // portion conductrice
+        ctxSwitch.fillStyle = color;
+        ctxSwitch.fillRect(baseX, yBar, wBar, barH);
+
+        // label phase + petite pastille numérique
+        ctxSwitch.fillStyle = color;
+        ctxSwitch.font = (10 * dpr) + 'px system-ui';
+        ctxSwitch.textAlign = 'left';
+        ctxSwitch.textBaseline = 'middle';
+        ctxSwitch.fillText(label, baseX - 20*dpr, yBar+3);
+
+        // petite valeur numérique du duty à droite
+        ctxSwitch.textAlign = 'right';
+        ctxSwitch.fillText(fracClamped.toFixed(2), baseX + barMax + 24*dpr, yBar+3);
+
+        yBar += barH + 6 * dpr;
+      }
+
+      ctxSwitch.save();
+      drawBarSwitch(Ta, '#ef4444', 'a+');
+      drawBarSwitch(Tb, '#22c55e', 'b+');
+      drawBarSwitch(Tc, '#3b82f6', 'c+');
+      // now minus IGBTs: Ta-, Tb-, Tc-
+      yBar += 10*dpr;
+
+      drawBarSwitch(1-Ta, '#ef4444', 'a-');
+      drawBarSwitch(1-Tb, '#22c55e', 'b-');
+      drawBarSwitch(1-Tc, '#3b82f6', 'c-');
+
+      ctxSwitch.restore();
+
+      // // --- marqueurs discrets Ta/Tb/Tc dans l'hexagone (codes couleur phases) ---
+//       ctxHex.save();
+//       ctxHex.lineWidth = 2;
+//       ctxHex.globalAlpha = 0.7;
+//       const rDuty = r * 0.40;
+//       const duties = [
+//         {d:Ta, ang:0,             col:'#ef4444'},  // phase a
+//         {d:Tb, ang:2*Math.PI/3,  col:'#22c55e'},  // phase b
+//         {d:Tc, ang:4*Math.PI/3,  col:'#3b82f6'}   // phase c
+//       ];
+//       duties.forEach(p=>{
+//         const L = rDuty * Math.max(0, Math.min(1, p.d));
+//         const x1 = cx;
+//         const y1 = cy;
+//         const x2 = cx + L * Math.cos(p.ang);
+//         const y2 = cy - L * Math.sin(p.ang);
+//         ctxHex.strokeStyle = p.col;
+//         ctxHex.beginPath();
+//         ctxHex.moveTo(x1, y1);
+//         ctxHex.lineTo(x2, y2);
+//         ctxHex.stroke();
+//       });
+//       ctxHex.restore();
+
+
+    }
+  } else if (ctxSwitch && cvSwitch){
+    // si masqué, on efface simplement le canvas de conduction
+    ctxSwitch.clearRect(0, 0, cvSwitch.width, cvSwitch.height);
+  }
+
+
+
+  }
+
+  
+  // repères V1..V6 + codes binaires + numérotation des secteurs
+  ctxHex.save();
+  ctxHex.font = 'bold 11px system-ui';
+  ctxHex.textAlign = 'center';
+  ctxHex.textBaseline = 'middle';
+
+  const vLabels = [
+    {name:'V1', code:'100', ang:0},
+    {name:'V2', code:'110', ang:Math.PI/3},
+    {name:'V3', code:'010', ang:2*Math.PI/3},
+    {name:'V4', code:'011', ang:3*Math.PI/3},
+    {name:'V5', code:'001', ang:4*Math.PI/3},
+    {name:'V6', code:'101', ang:5*Math.PI/3}
+  ];
+
+  const rLabel = r * 1.02;
+  const rCode  = r * 1.14;
+
+  vLabels.forEach(v => {
+    const ca = Math.cos(v.ang);
+    const sa = Math.sin(v.ang);
+
+    const xLabel = cx + rLabel * ca;
+    const yLabel = cy - rLabel * sa;
+    const xCode  = cx + rCode  * ca;
+    const yCode  = cy - rCode  * sa;
+
+    // Nom du vecteur (V1..V6)
+    ctxHex.fillStyle = '#e5e7eb';
+    ctxHex.fillText(v.name, xLabel, yLabel - 8);
+
+    // Code binaire associé
+    ctxHex.fillStyle = '#9ca3af';
+    ctxHex.fillText(v.code, xCode, yCode + 8);
+  });
+
+  // V0 au centre
+  ctxHex.fillStyle = '#e5e7eb';
+  ctxHex.fillText('V0', cx, cy + 6);
+  ctxHex.fillStyle = '#9ca3af';
+  ctxHex.fillText('000', cx, cy + 18);
+
+  // Numérotation des secteurs 1..6
+  const rSect = r * 0.55;
+  ctxHex.fillStyle = '#64748b';
+  ctxHex.font = '13px system-ui';
+  for (let s = 1; s <= 6; s++){
+    const ang = (s - 0.5) * Math.PI / 3;   // centre du secteur
+    const x = cx + rSect * Math.cos(ang);
+    const y = cy - rSect * Math.sin(ang);
+    ctxHex.fillText(String(s), x, y);
+  }
+
+
+
+  // Surbrillance des vecteurs actifs V_s et V_{s+1}
+  if (sector >= 1 && sector <= 6){
+    const angVs  = (sector - 1) * Math.PI/3;   // V_s
+    const angVs1 = sector * Math.PI/3;         // V_{s+1}
+    const rAct   = r * 1.05;
+
+    ctxHex.lineWidth = 2;
+    ctxHex.strokeStyle = '#f97316';  // orange pour bien ressortir
+
+    [angVs, angVs1].forEach(a=>{
+      const x = cx + rAct * Math.cos(a);
+      const y = cy - rAct * Math.sin(a);
+      ctxHex.beginPath();
+      ctxHex.moveTo(cx, cy);
+      ctxHex.lineTo(x, y);
+      ctxHex.stroke();
+    });
+  }
+
+  ctxHex.restore();
+
+// axes α/β
+  if (!showAlphaBeta || showAlphaBeta.checked){
+    ctxHex.strokeStyle = '#334155';
+    ctxHex.lineWidth = 1.5;
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx-r*1.1,cy);
+    ctxHex.lineTo(cx+r*1.1,cy);
+    ctxHex.stroke();
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx,cy-r*1.1);
+    ctxHex.lineTo(cx,cy+r*1.1);
+    ctxHex.stroke();
+    ctxHex.fillStyle = '#94a3b8';
+    ctxHex.font = 'bold 11px system-ui';
+    ctxHex.fillText('α', cx + r*1.1 + 4, cy+4);
+    ctxHex.fillText('β', cx-10, cy - r*1.1 - 4);
+  }
+
+  // // axes a/b/c
+//   if (!showABC || showABC.checked){
+//     const axes = [
+//       { name:'a', ang:0   },
+//       { name:'b', ang:120 },
+//       { name:'c', ang:240 }
+//     ];
+//     ctxHex.setLineDash([4,6]);
+//     ctxHex.strokeStyle = '#16a34a';
+//     ctxHex.lineWidth = 1.3;
+//     axes.forEach(A=>{
+//       const rad = A.ang*Math.PI/180;
+//       const x = cx + r*1.1*Math.cos(rad);
+//       const y = cy - r*1.1*Math.sin(rad);
+//       ctxHex.beginPath();
+//       ctxHex.moveTo(cx,cy);
+//       ctxHex.lineTo(x,y);
+//       ctxHex.stroke();
+//       ctxHex.fillStyle = '#bbf7d0';
+//       ctxHex.font = 'bold 11px system-ui';
+//       ctxHex.fillText(
+//         A.name,
+//         cx + (r*1.18)*Math.cos(rad) - 4,
+//         cy - (r*1.18)*Math.sin(rad) + 4
+//       );
+//     });
+//     ctxHex.setLineDash([]);
+//   }
+// 
+//   // --- vecteur αβ (bleu) ---
+  const scaleVec = r / maxAmp;
+  const vx = Valpha * scaleVec;
+  const vy = Vbeta  * scaleVec;
+
+  ctxHex.strokeStyle = '#22d3ee';
+  ctxHex.lineWidth = 2;
+  ctxHex.beginPath();
+  ctxHex.moveTo(cx,cy);
+  ctxHex.lineTo(cx+vx, cy-vy);
+  ctxHex.stroke();
+  ctxHex.fillStyle = '#22d3ee';
+  ctxHex.beginPath();
+  ctxHex.arc(cx+vx, cy-vy, 5, 0, 2*Math.PI);
+  ctxHex.fill();
+
+  // --- projections de Vref sur les axes α / β ---
+  const xTip = cx + vx;
+  const yTip = cy - vy;
+
+  ctxHex.save();
+  ctxHex.setLineDash([4,4]);
+  ctxHex.strokeStyle = 'rgba(148,163,184,0.95)';
+  ctxHex.lineWidth = 1.2;
+
+  // projection verticale sur l'axe α (horizontal)
+  ctxHex.beginPath();
+  ctxHex.moveTo(xTip, yTip);
+  ctxHex.lineTo(xTip, cy);
+  ctxHex.stroke();
+
+  // projection horizontale sur l'axe β (vertical)
+  ctxHex.beginPath();
+  ctxHex.moveTo(xTip, yTip);
+  ctxHex.lineTo(cx, yTip);
+  ctxHex.stroke();
+
+  ctxHex.restore();
+
+  // valeurs numériques Vα, Vβ près des axes
+  ctxHex.fillStyle = '#e5e7eb';
+  ctxHex.font = '10px system-ui';
+  ctxHex.textAlign = 'left';
+  ctxHex.textBaseline = 'middle';
+  ctxHex.fillText('Vα = ' + Valpha.toFixed(2), xTip + 6, cy - 6);
+  ctxHex.fillText('Vβ = ' + Vbeta.toFixed(2), cx + 6, yTip - 6);
+
+  // --- label Vref à l'extérieur ---
+  const vLen = Math.hypot(vx, vy);
+  if (vLen > 1e-3) {
+    const ux = vx / vLen;
+    const uy = vy / vLen;
+    const rText = r * 0.90;
+    const lx = cx + rText * ux;
+    const ly = cy - rText * uy;
+    ctxHex.fillStyle = '#22d3ee';
+    ctxHex.font = 'bold 11px system-ui';
+    ctxHex.textAlign = 'center';
+    ctxHex.textBaseline = 'middle';
+    ctxHex.fillText('Vref', lx, ly);
+  }
+
+// --- PROJECTIONS DU VECTEUR BLEU SUR LES VECTEURS ACTIFS (PARALLÈLES À V1..V6) ---
+  // On décompose v = a·V_s + b·V_{s+1} et on trace les côtés du parallélogramme :
+  //  - les points sur V_s et V_{s+1}
+  //  - deux segments pointillés depuis la pointe du vecteur,
+  //    parallèles à V_s et V_{s+1}, comme sur la maquette.
+
+  if (sector >= 1 && sector <= 6){
+    // V_s et V_{s+1}
+    const ang1 = (sector - 1) * Math.PI/3;      // direction de V_s
+    const ang2 = ang1 + Math.PI/3;              // direction de V_{s+1}
+
+    const u1 = { x: Math.cos(ang1), y: Math.sin(ang1) }; // V_s (unitaire)
+    const u2 = { x: Math.cos(ang2), y: Math.sin(ang2) }; // V_{s+1} (unitaire)
+    const v  = { x: vx, y: vy };                         // vecteur de réf. (en px)
+
+    // Résolution v = a·u1 + b·u2 dans la base (V_s, V_{s+1})
+    const det = u1.x * u2.y - u1.y * u2.x;               // = sin(60°) ≠ 0
+    if (Math.abs(det) > 1e-6){
+      const a = ( v.x * u2.y - v.y * u2.x) / det;
+      const b = (-v.x * u1.y + v.y * u1.x) / det;
+
+      // Points des composantes le long de V_s et V_{s+1}
+      const pVs  = { x: a * u1.x, y: a * u1.y };         // sur V_s
+      const pVs1 = { x: b * u2.x, y: b * u2.y };         // sur V_{s+1}
+      const pTip = v;                                    // pointe du vecteur bleu
+
+      ctxHex.setLineDash([3,5]);
+      ctxHex.strokeStyle = 'rgba(148,163,184,0.9)';
+      ctxHex.lineWidth = 1.5;
+      ctxHex.fillStyle = '#e5e7eb';
+
+      // Segment pointillé parallèle à V_{s+1} (pVs ↔ pointe)
+      //   (car pTip - pVs = b·u2)
+      ctxHex.beginPath();
+      ctxHex.moveTo(cx + pTip.x, cy - pTip.y);
+      ctxHex.lineTo(cx + pVs.x,  cy - pVs.y);
+      ctxHex.stroke();
+
+      // Segment pointillé parallèle à V_s (pVs1 ↔ pointe)
+      //   (car pTip - pVs1 = a·u1)
+      ctxHex.beginPath();
+      ctxHex.moveTo(cx + pTip.x,  cy - pTip.y);
+      ctxHex.lineTo(cx + pVs1.x, cy - pVs1.y);
+      ctxHex.stroke();
+
+      // Petits points sur V_s et V_{s+1}
+      ctxHex.beginPath();
+      ctxHex.arc(cx + pVs.x,  cy - pVs.y,  3, 0, 2*Math.PI);
+      ctxHex.fill();
+      ctxHex.beginPath();
+      ctxHex.arc(cx + pVs1.x, cy - pVs1.y, 3, 0, 2*Math.PI);
+      ctxHex.fill();
+
+      ctxHex.setLineDash([]);
+    }
+  }
+
+
+  // --- repère dq dans le plan αβ + vecteurs flux / couple ---
+
+  const cd = Math.cos(theta_e);
+  const sd = Math.sin(theta_e);
+
+  // petit cercle interne pour visualiser le référentiel dq
+  const rDQ = r * 0.55;
+  ctxHex.setLineDash([4,4]);
+  ctxHex.strokeStyle = '#1f2937';
+  ctxHex.lineWidth = 1;
+  ctxHex.beginPath();
+  ctxHex.arc(cx, cy, rDQ, 0, 2*Math.PI);
+  ctxHex.stroke();
+  ctxHex.setLineDash([]);
+
+  // === Rotor physique PMSM (2 ou 4 pôles) ===
+  // On distingue ici angle électrique theta_e et angle mécanique theta_m :
+  //   theta_m = theta_e / p, avec p = nombre de paires de pôles.
+  const rotorPoles = state.rotorPoles || 2;
+  const pPairs = Math.max(1, rotorPoles / 2);
+  const theta_m = theta_e / pPairs;   // angle mécanique du rotor
+
+  const rRotor = rDQ * 0.8;      // rayon du rotor, à l'intérieur du cercle dq
+  const poleR  = rRotor * 0.16;  // rayon des pastilles N / S
+  const poleL  = rRotor * 0.9;   // distance du centre jusqu’aux aimants
+
+  // Corps du rotor (en arrière-plan, semi-transparent)
+  ctxHex.save();
+  ctxHex.globalAlpha = 0.25;
+  ctxHex.beginPath();
+  ctxHex.fillStyle   = '#020617';
+  ctxHex.strokeStyle = '#272f3f';
+  ctxHex.lineWidth   = 1.2;
+  ctxHex.arc(cx, cy, rRotor, 0, 2*Math.PI);
+  ctxHex.fill();
+  ctxHex.stroke();
+  ctxHex.restore();
+
+  function drawPole(angle, label, color){
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const x = cx + poleL * c;
+    const y = cy - poleL * s;
+
+    ctxHex.beginPath();
+    ctxHex.fillStyle = color;
+    ctxHex.arc(x, y, poleR, 0, 2*Math.PI);
+    ctxHex.fill();
+
+    ctxHex.fillStyle   = '#0f172a';
+    ctxHex.font        = 'bold 9px system-ui';
+    ctxHex.textAlign   = 'center';
+    ctxHex.textBaseline = 'middle';
+    ctxHex.fillText(label, x, y);
+  }
+
+  if (rotorPoles === 4){
+    // 4 pôles : N-S-N-S tous les 90° MÉCANIQUES
+    const step = 2*Math.PI / rotorPoles; // ici = 90° mécaniques
+    drawPole(theta_m,           'N', '#38bdf8');
+    drawPole(theta_m + step,    'S', '#f97316');
+    drawPole(theta_m + 2*step,  'N', '#38bdf8');
+    drawPole(theta_m + 3*step,  'S', '#f97316');
+  } else {
+    // 2 pôles : N et S opposés, θélec = θméc
+    drawPole(theta_m,           'N', '#38bdf8');
+    drawPole(theta_m + Math.PI, 'S', '#f97316');
+  }
+
+  // Petit label pour clarifier
+  ctxHex.fillStyle   = '#cbd5e1';
+  ctxHex.font        = '10px system-ui';
+  ctxHex.textAlign   = 'left';
+  ctxHex.textBaseline = 'alphabetic';
+  const rotorLabel = rotorPoles === 4
+    ? 'PMSM — Rotor 4 pôles (ωm = ωe / 2)'
+    : 'PMSM — Rotor 2 pôles (ωm = ωe)';
+  ctxHex.fillText(rotorLabel, cx + rDQ*0.1, cy + rDQ*0.7);
+
+
+  // === Vecteurs dans le repère dq (flux d / couple q) ===
+  if (!showDQ || showDQ.checked){
+    // vecteur flux (d)
+    const fx = (m.d * scaleVec) * cd;
+    const fy = (m.d * scaleVec) * sd;
+
+    // flux en blanc
+    ctxHex.strokeStyle = '#f9fafb';
+    ctxHex.lineWidth = 2;
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx, cy);
+    ctxHex.lineTo(cx + fx, cy - fy);
+    ctxHex.stroke();
+    ctxHex.fillStyle = '#f9fafb';
+    ctxHex.beginPath();
+    ctxHex.arc(cx + fx, cy - fy, 4, 0, 2*Math.PI);
+    ctxHex.fill();
+
+    ctxHex.fillStyle = '#f9fafb';
+    ctxHex.font = 'bold 11px system-ui';
+    ctxHex.fillText('Flux (d)', cx + fx * 1.22 + 8, cy - fy * 1.18 - 4);
+
+    // vecteur couple (q)
+    const qx = (-m.q * scaleVec) * sd;
+    const qy = ( m.q * scaleVec) * cd;
+
+    ctxHex.strokeStyle = '#ef4444';
+    ctxHex.lineWidth = 2;
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx, cy);
+    ctxHex.lineTo(cx + qx, cy - qy);
+    ctxHex.stroke();
+    ctxHex.fillStyle = '#ef4444';
+    ctxHex.beginPath();
+    ctxHex.arc(cx + qx, cy - qy, 4, 0, 2*Math.PI);
+    ctxHex.fill();
+
+    ctxHex.fillStyle = '#ef4444';
+    ctxHex.font = 'bold 11px system-ui';
+    ctxHex.fillText('Couple (q)', cx + qx * 1.18 + 8, cy - qy * 1.18 - 4);
+  }
+
+
+// projections Id / Iq dans le plan αβ
+  if (!showDQ || showDQ.checked){
+    // Courant statorique dans αβ reconstruit à partir de Id/Iq
+    const Id = m.d;
+    const Iq = m.q;
+    const Ialpha =  Id * cd - Iq * sd;
+    const Ibeta  =  Id * sd + Iq * cd;
+
+    const kIvec = r / maxAmp; // même échelle que le vecteur bleu
+    const ix = Ialpha * kIvec;
+    const iy = Ibeta  * kIvec;
+
+    // vecteur courant en couleur Vref
+    ctxHex.setLineDash([]);
+    ctxHex.strokeStyle = '#22d3ee';
+    ctxHex.lineWidth = 2.5;
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx, cy);
+    ctxHex.lineTo(cx + ix, cy - iy);
+    ctxHex.stroke();
+    ctxHex.fillStyle = '#22d3ee';
+    ctxHex.beginPath();
+    ctxHex.arc(cx + ix, cy - iy, 3, 0, 2*Math.PI);
+    ctxHex.fill();
+
+
+    if (document.getElementById('showBs').checked) {
+    // Champ magnétique statorique (proportionnel au courant statorique dans αβ)
+    // Ici on réutilise Ialpha / Ibeta et la même échelle kIvec que le vecteur courant.
+    const Bx = Ialpha * kIvec;
+    const By = Ibeta  * kIvec;
+
+    ctxHex.setLineDash([]);
+    ctxHex.strokeStyle = '#22c55e';  // vert pour le champ stator
+    ctxHex.lineWidth = 2.5;
+    ctxHex.beginPath();
+    ctxHex.moveTo(cx, cy);
+    ctxHex.lineTo(cx + Bx, cy - By);
+    ctxHex.stroke();
+
+    ctxHex.fillStyle = '#22c55e';
+    ctxHex.beginPath();
+    ctxHex.arc(cx + Bx, cy - By, 4, 0, 2*Math.PI);
+    ctxHex.fill();
+
+    ctxHex.font = 'bold 11px system-ui';
+    ctxHex.fillText('Champ stator', cx + Bx * 1.18 + 6, cy - By * 1.18 - 4);
+    }
+
+
+    // projections parallelogramme sur flux(d) et couple(q)
+    // axes unitaires d et q dans αβ
+    const udx = cd, udy = sd;
+    const uqx = -sd, uqy = cd;
+
+    // coefficients de projection dans la base (d,q)
+    const det = udx*uqy - udy*uqx; // = 1 normalement
+    if (Math.abs(det) > 1e-6){
+      const a = ( ix*uqy - iy*uqx) / det; // composante Id
+      const b = (-ix*udy + iy*udx) / det; // composante Iq
+
+      const pD = { x: a*udx, y: a*udy };
+      const pQ = { x: b*uqx, y: b*uqy };
+
+      ctxHex.setLineDash([3,5]);
+      ctxHex.strokeStyle = 'rgba(248,250,252,0.75)';
+      ctxHex.lineWidth = 1.3;
+
+      // depuis la pointe du courant vers Id (parallèle à q)
+      ctxHex.beginPath();
+      ctxHex.moveTo(cx + ix, cy - iy);
+      ctxHex.lineTo(cx + pD.x, cy - pD.y);
+      ctxHex.stroke();
+
+      // depuis la pointe du courant vers Iq (parallèle à d)
+      ctxHex.beginPath();
+      ctxHex.moveTo(cx + ix, cy - iy);
+      ctxHex.lineTo(cx + pQ.x, cy - pQ.y);
+      ctxHex.stroke();
+
+      ctxHex.setLineDash([]);
+      ctxHex.fillStyle = '#ef4444';
+      ctxHex.font = '10px system-ui';
+      ctxHex.fillStyle = '#ffffff';
+ctxHex.font = 'bold 11px system-ui';
+ctxHex.fillText('Id', cx + pD.x*1.10 + 4, cy - pD.y*1.10 - 2);
+ctxHex.fillStyle = '#ef4444';
+ctxHex.fillText('Iq', cx + pQ.x*1.10 + 4, cy - pQ.y*1.10 - 2);
+    }
+  }
+
+
+  // triangle SVPWM t1/t2 (décomposition du vecteur de référence)
+  if (!showT || showT.checked){
+    const t1 = tv.t1;
+    const t2 = tv.t2;
+    if (sector >= 1 && sector <= 6 && t1 > 0 && t2 > 0){
+      // directions des deux vecteurs actifs du secteur
+      const angA = (sector-1) * Math.PI/3;
+      const angB = sector * Math.PI/3;
+
+      // on utilise les rapports cycliques (d1, d2) pour une géométrie lisible
+      const d1 = tv.t1 / Ts;
+      const d2 = tv.t2 / Ts;
+      const kLen = r * 0.75;
+
+      const ax = kLen * d1 * Math.cos(angA);
+      const ay = kLen * d1 * Math.sin(angA);
+      const bx = ax + kLen * d2 * Math.cos(angB);
+      const by = ay + kLen * d2 * Math.sin(angB);
+
+      const pO = { x: cx,       y: cy       };
+      const p1 = { x: cx + ax, y: cy - ay };
+      const p2 = { x: cx + bx, y: cy - by };
+
+      ctxHex.save();
+
+      // Vecteurs colorés : t1/Ts·V1, t2/Ts·V2, et Vref
+      ctxHex.lineWidth = 2.0;
+
+      // t1/Ts · V1 (bleu)
+      ctxHex.strokeStyle = '#3b82f6';
+      ctxHex.beginPath();
+      ctxHex.moveTo(pO.x, pO.y);
+      ctxHex.lineTo(p1.x, p1.y);
+      ctxHex.stroke();
+
+      // t2/Ts · V2 (magenta) – depuis l’extrémité de V1
+      ctxHex.strokeStyle = '#e11d48';
+      ctxHex.beginPath();
+      ctxHex.moveTo(p1.x, p1.y);
+      ctxHex.lineTo(p2.x, p2.y);
+      ctxHex.stroke();
+
+      // Vref résultant (cyan)
+      ctxHex.strokeStyle = '#22d3ee';
+      ctxHex.beginPath();
+      ctxHex.moveTo(pO.x, pO.y);
+      ctxHex.lineTo(p2.x, p2.y);
+      ctxHex.stroke();
+
+      // Triangle en pointillés pour souligner la combinaison linéaire
+      ctxHex.setLineDash([4,4]);
+      ctxHex.lineWidth = 1.5;
+      ctxHex.strokeStyle = 'rgba(148,163,184,0.9)';
+      ctxHex.fillStyle = 'rgba(15,23,42,0.18)';
+
+      ctxHex.beginPath();
+      ctxHex.moveTo(pO.x, pO.y);
+      ctxHex.lineTo(p1.x, p1.y);
+      ctxHex.lineTo(p2.x, p2.y);
+      ctxHex.closePath();
+
+      // labels t1 et t2 près des extrémités
+      ctxHex.fillStyle = '#ffffff';
+      ctxHex.font = 'bold 11px system-ui';
+      ctxHex.textAlign = 'left';
+
+      ctxHex.fillText('t1', p1.x + 6, p1.y + 6);
+      ctxHex.fillText('t2', p2.x + 6, p2.y + 6);
+
+      ctxHex.fill();
+      ctxHex.stroke();
+
+      ctxHex.setLineDash([]);
+      ctxHex.restore();
+    }
+  }
+// // courants de phase projetés
+//   if (!showCurrents || showCurrents.checked){
+//     const maxI = Math.max(0.1, state.amp*1.2);
+//     const kI = r / maxI * 0.45;
+//     const phases = [
+//       { i:m.ia, ang:0,   color:'#ef4444' },
+//       { i:m.ib, ang:120, color:'#22c55e' },
+//       { i:m.ic, ang:240, color:'#3b82f6' }
+//     ];
+//     phases.forEach(ph=>{
+//       const rad = ph.ang*Math.PI/180;
+//       const len = ph.i * kI;
+//       const x = cx + len*Math.cos(rad);
+//       const y = cy - len*Math.sin(rad);
+//       ctxHex.strokeStyle = ph.color;
+//       ctxHex.lineWidth = 4;
+//       ctxHex.beginPath();
+//       ctxHex.moveTo(cx,cy);
+//       ctxHex.lineTo(x,y);
+//       ctxHex.stroke();
+//       ctxHex.beginPath();
+//       ctxHex.arc(x,y,3,0,2*Math.PI);
+//       ctxHex.fillStyle = ph.color;
+//       ctxHex.fill();
+//     });
+//   }
+// 
+//   // anneau d’angle électrique + angle secteur
+  if (!showAngles || showAngles.checked){
+    ctxHex.setLineDash([4,4]);
+    ctxHex.strokeStyle = '#38bdf8';
+    ctxHex.lineWidth = 1.8;
+    ctxHex.beginPath();
+
+    // angle électrique du vecteur de référence dans αβ
+    let angWrap = angle % (2*Math.PI);
+    if (angWrap < 0) angWrap += 2*Math.PI;
+
+    // arc de 0 → θe (wrapé) en repère canvas (Y vers le bas)
+    ctxHex.arc(cx, cy, r*0.22, 0, -angWrap, true);
+    ctxHex.stroke();
+
+    // arc de secteur θm
+    ctxHex.strokeStyle = '#facc15';
+    ctxHex.beginPath();
+    const base = (sector-1)*(Math.PI/3);
+    ctxHex.arc(cx,cy,r*0.30, -base, -(base+theta_s), true);
+    ctxHex.stroke();
+    ctxHex.setLineDash([]);
+
+    // libellés θe et θm
+    ctxHex.fillStyle = '#38bdf8';
+    ctxHex.font = 'bold 11px system-ui';
+    ctxHex.fillText(
+      'θ_αβ='+(((angle*180/Math.PI)%360+360)%360).toFixed(1)+'°',
+      cx + r*0.25,
+      cy+14
+    );
+
+    ctxHex.fillStyle = '#facc15';
+    const mid = base + theta_s/2;
+    ctxHex.fillText(
+      'θm='+(theta_s*180/Math.PI).toFixed(1)+'°',
+      cx + r*0.34*Math.cos(mid),
+      cy - r*0.34*Math.sin(mid)
+    );
+  }
+
+}
+// --- Barre t0/2 – t1 – t2 – t0/2 + Ta/Tb/Tc dans le canvas PWM ---
+function drawPWMTimelineInPWM(tv){
+  if (!ctxPWM || !cvPWM) return;
+
+  const w = cvPWM.width;
+  const h = cvPWM.height;
+
+  const padL  = 40;
+  const padR  = 10;
+  const barTop = 30;       // position verticale de la barre t0/2–t1–t2–t0/2
+  const barH   = 10;       // hauteur de la barre
+  const barW   = w - padL - padR;
+
+  const t1 = tv.t1;
+  const t2 = tv.t2;
+  const t0 = tv.t0;
+  const total = t0 + t1 + t2 || Ts;
+  const kx = barW / total;
+
+  const x0 = padL;
+  const y0 = barTop;
+
+  // on nettoie la zone du haut (barre + Ta/Tb/Tc)
+  ctxPWM.save();
+  ctxPWM.fillStyle = '#020617';
+  ctxPWM.fillRect(0, 0, w, barTop + barH + 40);
+
+  // =========================
+  //  Barre t0/2 – t1 – t2 – t0/2
+  // =========================
+  let x = x0;
+  const t0half = t0/2;
+
+  // t0/2 gauche
+  ctxPWM.fillStyle = '#1f2937';
+  ctxPWM.fillRect(x, y0, t0half*kx, barH);
+  x += t0half*kx;
+
+  // t1
+  ctxPWM.fillStyle = '#38bdf8';
+  ctxPWM.fillRect(x, y0, t1*kx, barH);
+  x += t1*kx;
+
+  // t2
+  ctxPWM.fillStyle = '#22c55e';
+  ctxPWM.fillRect(x, y0, t2*kx, barH);
+  x += t2*kx;
+
+  // t0/2 droite
+  ctxPWM.fillStyle = '#1f2937';
+  ctxPWM.fillRect(x, y0, t0half*kx, barH);
+
+  // contour
+  ctxPWM.strokeStyle = '#e5e7eb';
+  ctxPWM.lineWidth = 1;
+  ctxPWM.strokeRect(x0, y0, barW, barH);
+
+  // légendes au-dessus
+  ctxPWM.textAlign = 'center';
+  ctxPWM.textBaseline = 'bottom';
+  ctxPWM.font = '10px system-ui';
+
+  ctxPWM.fillStyle = '#9ca3af';
+  ctxPWM.fillText('t0/2', x0 + (t0half*kx)/2, y0 - 2);
+
+  ctxPWM.fillStyle = '#38bdf8';
+  ctxPWM.fillText('t1', x0 + t0half*kx + (t1*kx)/2, y0 - 2);
+
+  ctxPWM.fillStyle = '#22c55e';
+  ctxPWM.fillText('t2', x0 + t0half*kx + t1*kx + (t2*kx)/2, y0 - 2);
+
+  ctxPWM.fillStyle = '#9ca3af';
+  ctxPWM.fillText('t0/2', x, y0 - 2);
+
+  // ===============================
+  //  Barres Ta / Tb / Tc (duty)
+  // ===============================
+  const sector = tv.sector || 0;
+  if (sector >= 1 && sector <= 6 && typeof onTimes === 'function'){
+    const on = onTimes(t1, t2, t0, sector);
+    const Ta = on.Ta;
+    const Tb = on.Tb;
+    const Tc = on.Tc;
+
+    const dutyBarH = 6;
+    const dutyGap  = 4;
+    let yDuty = y0 + barH + 8;   // juste sous la barre principale
+
+    function drawDuty(label, time, color){
+      const frac = Math.max(0, Math.min(1, time / Ts));
+      const wDuty = barW * frac;
+
+      // fond
+      ctxPWM.fillStyle = 'rgba(15,23,42,0.9)';
+      ctxPWM.fillRect(x0, yDuty-1, barW, dutyBarH+2);
+
+      // portion conductrice
+      ctxPWM.fillStyle = color;
+      ctxPWM.fillRect(x0, yDuty, wDuty, dutyBarH);
+
+      // label à gauche
+      ctxPWM.textAlign = 'left';
+      ctxPWM.textBaseline = 'middle';
+      ctxPWM.font = '11px system-ui';
+      ctxPWM.fillStyle = color;
+      ctxPWM.fillText(label, x0 - 18, yDuty + dutyBarH/2);
+
+      // valeur numérique (duty) à droite
+      ctxPWM.textAlign = 'right';
+      ctxPWM.fillText(frac.toFixed(2), x0 + barW + 40, yDuty + dutyBarH/2);
+
+      yDuty += dutyBarH + dutyGap;
+    }
+
+    // couleurs cohérentes avec le reste
+    drawDuty('Ta', Ta, '#ef4444'); // phase a (rouge)
+    drawDuty('Tb', Tb, '#22c55e'); // phase b (vert)
+    drawDuty('Tc', Tc, '#3b82f6'); // phase c (bleu)
+  }
+
+  ctxPWM.restore();
+}
+
+
+     // On conserve les fonctions PWM / OUT d'origine simplifiées
+  function drawPWM(){
+    const w = cvPWM.width;
+    const h = cvPWM.height;
+    ctxPWM.clearRect(0,0,w,h);
+    ctxPWM.fillStyle = '#020617';
+    ctxPWM.fillRect(0,0,w,h);
+
+    const f = state.freq;
+    if (f <= 0){
+      ctxPWM.fillStyle = '#64748b';
+      ctxPWM.font = '12px system-ui, sans-serif';
+      ctxPWM.fillText('Fréquence nulle.', 10, 24);
+      return;
+    }
+
+        const T  = 1/f;
+    const fc = Math.min(10*f, 2000); // fréquence porteuse
+    const N  = 400;
+
+    // --- calcul des temps SVPWM pour la timeline PWM ---
+    const mNow = modelAt(simTime());
+    const maxAmp = Math.max(0.1, state.amp*1.4);
+    const kVolt  = Rref / maxAmp;
+    const ValphaV = mNow.alpha * kVolt;
+    const VbetaV  = mNow.beta  * kVolt;
+    const tv = svpwmTimes(ValphaV, VbetaV);
+    drawPWMTimelineInPWM(tv);
+
+
+
+        const left   = 40;
+    const right  = w - 10;
+    const top    = 100;   // <- au lieu de 15 pour laisser la place à la barre t0/2–t1–t2–t0/2
+    const bottom = h - 10;
+
+    const bandHeight = (bottom - top)/3;
+	const cursorTop = top - 25;     // commence un peu plus haut
+	const cursorBottom = bottom + 5; // finit un peu plus bas
+	const extraGap = 10;  // écart supplémentaire entre les voies Sa / Sb / Sc
+
+    ctxPWM.strokeStyle = '#1f2937';
+    ctxPWM.lineWidth = 1;
+    for(let k=0;k<4;k++){
+      const y = top + k*bandHeight;
+      ctxPWM.beginPath();
+      ctxPWM.moveTo(left, y);
+      ctxPWM.lineTo(right, y);
+      ctxPWM.stroke();
+    }
+
+    // label PWM
+    ctxPWM.fillStyle = '#e5e7eb';
+    ctxPWM.font = '11px system-ui';
+    ctxPWM.textAlign = 'left';
+    ctxPWM.textBaseline = 'top';
+    ctxPWM.fillText('PWM — impulsions U_a, U_b, U_c', left, 2);
+
+    const t0 = simTime();
+    let lastSa=null,lastSb=null,lastSc=null;
+
+ // centres verticaux des trois voies, avec un peu plus d'écart
+const centerA = bottom - bandHeight*0.5;
+const centerB = bottom - bandHeight*1.5 - extraGap;
+const centerC = bottom - bandHeight*2.5 - 2*extraGap;
+
+
+	
+
+    // labels Sa / Sb / Sc
+    ctxPWM.fillStyle = '#e5e7eb';
+    ctxPWM.font = '11px system-ui';
+    ctxPWM.textAlign = 'right';
+    ctxPWM.textBaseline = 'middle';
+    ctxPWM.fillText('Sa', left - 10, centerC);
+    ctxPWM.fillText('Sb', left - 10, centerB);
+    ctxPWM.fillText('Sc', left - 10, centerA);
+
+    const ampY = bandHeight*0.45; // amplitude verticale dans chaque bande
+
+    // ↳ normalisation avec une référence FIXE (I_phase max = 2 A)
+const maxI = 2.0;
+
+    for(let i=0;i<=N;i++){
+      const x = left + (right-left)*i/N;
+      const t = t0 - T + (i/N)*T;
+
+      const carrier = Math.sin(2*Math.PI*fc*t);
+
+      // Courants issus du modèle FOC (avec déséquilibre)
+      const m  = modelAt(t);
+      const ma = m.ia / maxI;  // ~[-1,1]
+      const mb = m.ib / maxI;
+      const mc = m.ic / maxI;
+
+      const Sa = ma >= carrier ? 1 : 0;
+      const Sb = mb >= carrier ? 1 : 0;
+      const Sc = mc >= carrier ? 1 : 0;
+
+      const yA = centerC + (Sa ? -ampY : ampY);
+      const yB = centerB + (Sb ? -ampY : ampY);
+      const yC = centerA + (Sc ? -ampY : ampY);
+
+      ctxPWM.strokeWidth = 1.5;
+
+      ctxPWM.strokeStyle = '#ef4444';
+      if(lastSa){ ctxPWM.beginPath(); ctxPWM.moveTo(lastSa.x,lastSa.y); ctxPWM.lineTo(x,yA); ctxPWM.stroke(); }
+      lastSa = {x,y:yA};
+
+      ctxPWM.strokeStyle = '#22c55e';
+      if(lastSb){ ctxPWM.beginPath(); ctxPWM.moveTo(lastSb.x,lastSb.y); ctxPWM.lineTo(x,yB); ctxPWM.stroke(); }
+      lastSb = {x,y:yB};
+
+      ctxPWM.strokeStyle = '#3b82f6';
+      if(lastSc){ ctxPWM.beginPath(); ctxPWM.moveTo(lastSc.x,lastSc.y); ctxPWM.lineTo(x,yC); ctxPWM.stroke(); }
+      lastSc = {x,y:yC};
+    }
+
+    // --- Barre verticale synchronisée avec le point 1 Hz (analyse des commutations) ---
+    (function(){
+      const fMarker = 1; // Hz (doit rester cohérent avec drawHex)
+      let idx200;
+      if (state.svpwmStepMode){
+        idx200 = (state.svpwmStepIndex || 0) % 200;
+      } else {
+        const markerT = state.markerT || 0;
+        const markerPhase = (markerT * fMarker) % 1;
+        idx200 = Math.floor(markerPhase * 200) % 200;
+      }
+      const phase200 = idx200 / 200;
+      const xCursor = left + (right - left) * phase200;
+
+      ctxPWM.save();
+      ctxPWM.strokeStyle = '#ffffff';
+      ctxPWM.lineWidth = 1;
+      ctxPWM.setLineDash([4,4]);
+      ctxPWM.beginPath();
+      ctxPWM.moveTo(xCursor, cursorTop);
+	  ctxPWM.lineTo(xCursor, cursorBottom);
+
+      ctxPWM.stroke();
+      ctxPWM.restore();
+    })();
+
+    // Overlay Ua, Ub, Uc on mouse hover + curseur vertical qui suit la souris
+    if (pwmMouseX !== null){
+      const mouseX = Math.max(left, Math.min(right, pwmMouseX));
+      const phase = (mouseX - left) / (right - left);
+      const tProbe = t0 - T + phase * T;
+
+      const carrierProbe = Math.sin(2*Math.PI*fc*tProbe);
+      const mProbe  = modelAt(tProbe);
+      const maP = mProbe.ia / maxI;
+      const mbP = mProbe.ib / maxI;
+      const mcP = mProbe.ic / maxI;
+
+      const SaP = maP >= carrierProbe ? 1 : 0;
+      const SbP = mbP >= carrierProbe ? 1 : 0;
+      const ScP = mcP >= carrierProbe ? 1 : 0;
+
+      // Ligne verticale liée à la souris
+      ctxPWM.save();
+      ctxPWM.strokeStyle = '#e5e7eb';
+      ctxPWM.lineWidth = 1;
+      ctxPWM.setLineDash([2,2]);
+      ctxPWM.beginPath();
+      ctxPWM.moveTo(mouseX, cursorTop);
+	 ctxPWM.lineTo(mouseX, cursorBottom);
+
+      ctxPWM.stroke();
+      ctxPWM.restore();
+
+      // Infobulle Ua, Ub, Uc près de la souris
+      const boxW = 170;
+      const boxH = 40;
+      let boxX = mouseX + 10;
+      if (boxX + boxW > right) boxX = mouseX - boxW - 10;
+      if (boxX < left + 4) boxX = left + 4;
+      const boxY = top + 6;
+
+      ctxPWM.save();
+      ctxPWM.fillStyle = 'rgba(15,23,42,0.9)';
+      ctxPWM.fillRect(boxX, boxY, boxW, boxH);
+      ctxPWM.fillStyle = '#e5e7eb';
+      ctxPWM.font = '11px system-ui';
+      ctxPWM.textAlign = 'left';
+      ctxPWM.textBaseline = 'top';
+      ctxPWM.fillText('Ua = ' + (SaP ? '+Vdc' : '-Vdc'), boxX + 8, boxY + 6);
+      ctxPWM.fillText('Ub = ' + (SbP ? '+Vdc' : '-Vdc'), boxX + 8, boxY + 18);
+      ctxPWM.fillText('Uc = ' + (ScP ? '+Vdc' : '-Vdc'), boxX + 8, boxY + 30);
+      ctxPWM.restore();
+    }
+  }
+
+  function drawOUT(){
+    const w = cvOUT.width;
+    const h = cvOUT.height;
+    ctxOUT.clearRect(0,0,w,h);
+    ctxOUT.fillStyle = '#020617';
+    ctxOUT.fillRect(0,0,w,h);
+
+    const f = state.freq;
+    if (f <= 0){
+      ctxOUT.fillStyle = '#64748b';
+      ctxOUT.font = '12px system-ui, sans-serif';
+      ctxOUT.fillText('Fréquence nulle.', 10, 24);
+      return;
+    }
+
+    const T = 1/f;
+    const N = 400;
+    const left   = 40;
+    const right  = w - 10;
+    const top    = 18;
+    const bottom = h - 20;
+
+    // Échelle verticale un peu large pour amp + déséquilibre
+    const vmin = -2.2, vmax = 2.2;
+    function ymap(v){
+      return bottom - ( (v - vmin) / (vmax - vmin) ) * (bottom - top);
+    }
+
+    // grille
+    ctxOUT.strokeStyle = '#111827';
+    ctxOUT.lineWidth = 1;
+    ctxOUT.beginPath();
+    for(let k=0;k<=4;k++){
+      const x = left + (right-left)*k/4;
+      ctxOUT.moveTo(x, top);
+      ctxOUT.lineTo(x, bottom);
+    }
+    ctxOUT.stroke();
+
+    // label abc
+    ctxOUT.fillStyle = '#e5e7eb';
+    ctxOUT.font = '11px system-ui';
+    ctxOUT.textAlign = 'left';
+    ctxOUT.textBaseline = 'top';
+    ctxOUT.fillText('abc — courants de phase', left, 4);
+
+    const t0 = simTime();
+    let lastVa=null,lastVb=null,lastVc=null;
+
+    for(let i=0;i<=N;i++){
+      const x = left + (right-left)*i/N;
+      const t = t0 - T + (i/N)*T;
+
+      // Courants du modèle (donc avec déséquilibre)
+      const m  = modelAt(t);
+      const Va = m.ia;
+      const Vb = m.ib;
+      const Vc = m.ic;
+
+      const ya = ymap(Va);
+      const yb = ymap(Vb);
+      const yc = ymap(Vc);
+
+      ctxOUT.strokeStyle = '#ef4444';
+      if (lastVa){ ctxOUT.beginPath(); ctxOUT.moveTo(lastVa.x,lastVa.y); ctxOUT.lineTo(x,ya); ctxOUT.stroke(); }
+      lastVa = {x,y:ya};
+
+      ctxOUT.strokeStyle = '#22c55e';
+      if (lastVb){ ctxOUT.beginPath(); ctxOUT.moveTo(lastVb.x,lastVb.y); ctxOUT.lineTo(x,yb); ctxOUT.stroke(); }
+      lastVb = {x,y:yb};
+
+      ctxOUT.strokeStyle = '#3b82f6';
+      if (lastVc){ ctxOUT.beginPath(); ctxOUT.moveTo(lastVc.x,lastVc.y); ctxOUT.lineTo(x,yc); ctxOUT.stroke(); }
+      lastVc = {x,y:yc};
+    }
+  }
+
+  // boucle d’animation SVPWM (utilise le temps global state.t → freq unique)
+  function loopSVPWM(){
+    drawHex();
+    drawPWM();
+    drawOUT();
+    requestAnimationFrame(loopSVPWM);
+  }
+  requestAnimationFrame(loopSVPWM);
+
+  // boucle d’animation SVPWM (utilise le temps global state.t → freq unique)
+  function loopSVPWM(){
+    drawHex();
+    drawPWM();
+    drawOUT();
+	drawClarkePark();   // ⬅ ajout ici
+    requestAnimationFrame(loopSVPWM);
+  }
+  requestAnimationFrame(loopSVPWM);
+}
+  // ==== Boucle globale de temps (simulation commune à tous les panneaux) ====
+  
+  
+  
+  // ==== Onduleur SVG synchronisé (IGBT par phase, calés sur Ta/Tb/Tc de l'hexagone) ====
+  const inverterSvg = document.getElementById('inverter-svg');
+  let inverterIgbts = [];
+  let igbtMap = null;
+  let windingMap = null;
+  let inverterConduction = {Ta:0, Tb:0, Tc:0};
+  let inverterSwitch = {Sa:false, Sb:false, Sc:false};
+  let igbtLabelsAdded = false;
+  let inverterCodeEl = null;
+
+  if (inverterSvg){
+    inverterIgbts = Array.from(inverterSvg.querySelectorAll('[style*="#ff0000"]'));
+        inverterIgbts.forEach(el => {
+      el.classList.add('igbt-red');
+      // couleurs gérées uniquement par les classes CSS
+      el.style.stroke = '';
+      el.style.fill   = '';
+      el.style.opacity = '';
+
+      // on mémorise la transform d'origine pour pouvoir ajouter un décalage Y
+      const baseTransform = el.getAttribute('transform') || '';
+      el.dataset.baseTransform = baseTransform;
+    });
+
+
+    // classification automatique des 6 IGBT rouges en (a,b,c) haut/bas selon leur position
+    if (inverterIgbts.length === 6){
+      const withBox = inverterIgbts.map(el => {
+        const b = el.getBBox();
+        return {
+          el,
+          cx: b.x + b.width/2,
+          cy: b.y + b.height/2
+        };
+      });
+      const ys = withBox.map(o => o.cy).slice().sort((a,b)=>a-b);
+      const midY = (ys[0] + ys[ys.length-1]) / 2;
+
+      const top = withBox.filter(o => o.cy <= midY).sort((a,b)=>a.cx-b.cx);
+      const bot = withBox.filter(o => o.cy >  midY).sort((a,b)=>a.cx-b.cx);
+
+      if (top.length === 3 && bot.length === 3){
+
+        // marquage haut / bas pour l'animation (translation verticale)
+        top.forEach(o => { o.el.dataset.pos = 'top'; });
+        bot.forEach(o => { o.el.dataset.pos = 'bot'; });
+
+        igbtMap = {
+          aTop: top[0].el,
+          bTop: top[1].el,
+          cTop: top[2].el,
+          aBot: bot[0].el,
+          bBot: bot[1].el,
+          cBot: bot[2].el
+        };
+
+        addIgbtLabels();
+      }
+    }
+
+    // Mapping explicite des 3 enroulements moteurs (haut/milieu/bas)
+// → on limite la recherche à l'intérieur de l'SVG de l'onduleur
+windingMap = {
+  a: inverterSvg.querySelector('#coilA_sinus'),
+  b: inverterSvg.querySelector('#coilB_sinus'),
+  c: inverterSvg.querySelector('#coilC_sinus')
+};
+
+
+
+
+
+// Couleurs par phase pour les enroulements (rouge / vert / bleu)
+// Bordure seule (fill = none) pour ne "flasher" que le contour
+if (windingMap){
+  if (windingMap.a){
+    windingMap.a.style.stroke = '#ef4444'; // rouge (haut)
+    windingMap.a.style.fill   = 'none';
+  }
+  if (windingMap.b){
+    windingMap.b.style.stroke = '#22c55e'; // vert (milieu)
+    windingMap.b.style.fill   = 'none';
+  }
+  if (windingMap.c){
+    windingMap.c.style.stroke = '#3b82f6'; // bleu (bas)
+    windingMap.c.style.fill   = 'none';
+  }
+}
+}
+
+
+  function addIgbtLabels(){
+    if (!inverterSvg || !igbtMap || igbtLabelsAdded) return;
+
+    const labelDefs = [
+      ['aTop','a+','#ffffff'],
+      ['bTop','b+','#ffffff'],
+      ['cTop','c+','#ffffff'],
+      ['aBot','a-','#ffffff'],
+      ['bBot','b-','#ffffff'],
+      ['cBot','c-','#ffffff']
+    ];
+    const ns = 'http://www.w3.org/2000/svg';
+    const parent = inverterSvg.querySelector('#layer1') || inverterSvg;
+
+    labelDefs.forEach(([key,text,color])=>{
+      const el = igbtMap[key];
+      if (!el) return;
+      const b = el.getBBox();
+      const isTop = key.endsWith('Top');
+      const x = b.x + b.width/2;
+      const y = isTop ? (b.y - 2) : (b.y + b.height + 4);
+
+      const t = inverterSvg.ownerDocument.createElementNS(ns,'text');
+      t.setAttribute('x', (x-3).toFixed(2));
+      t.setAttribute('y', y.toFixed(2));
+      t.setAttribute('fill', color);
+      t.setAttribute('font-size','5');
+      t.setAttribute('text-anchor', 'middle');
+      t.textContent = text;
+      parent.appendChild(t);
+    });
+
+    // Ajout du label global SaSbSc (ex : 101) au-dessus du bras B
+    if (!inverterCodeEl){
+      const codeText = inverterSvg.ownerDocument.createElementNS(ns,'text');
+      codeText.setAttribute('id','svm-code');
+
+      // Positionné dynamiquement par rapport au transistor b+ (bras B haut)
+      const bBoxBtop = igbtMap && igbtMap.bTop ? igbtMap.bTop.getBBox() : null;
+      const codeX = bBoxBtop ? (bBoxBtop.x + bBoxBtop.width/2) : 80;
+      const codeY = bBoxBtop ? (bBoxBtop.y - 15) : 18;
+
+      codeText.setAttribute('x', codeX.toFixed(2));
+      codeText.setAttribute('y', codeY.toFixed(2));
+      codeText.setAttribute('fill','#22d3ee');
+      codeText.setAttribute('font-size','6');
+      codeText.setAttribute('font-family','monospace');
+      codeText.setAttribute('font-weight','bold');
+      codeText.setAttribute('text-anchor','middle');
+      codeText.textContent = '000';
+      parent.appendChild(codeText);
+      inverterCodeEl = codeText;
+    }
+
+    igbtLabelsAdded = true;
+  }
+
+  function setIgbtConduction(el, duty){
+    if (!el) return;
+    const d = Math.max(0, Math.min(1, duty));
+    const isOn = d > 0.02;
+
+    // Forcer la couleur des IGBT en blanc
+    el.style.stroke = '#ffffff';
+    el.style.fill = '#ffffff';
+
+    // Opacité : on garde ton effet de pulsation léger
+    if (isOn){
+      const alpha = 0.25 + 0.75 * d;
+      el.style.opacity = alpha.toFixed(2);
+    } else {
+      el.style.opacity = 1;
+    }
+
+    // Translation verticale pour matérialiser l'état passant / bloqué
+    const maxShift = 6; // en pixels (amplitude plus visible)
+    let dy = 0;
+
+    const pos = el.dataset ? el.dataset.pos : undefined;
+
+    if (isOn){
+      if (pos === 'top'){
+        // IGBT du haut : descend légèrement vers le point milieu
+        dy = maxShift;
+      } else if (pos === 'bot'){
+        // IGBT du bas : monte légèrement vers le point milieu
+        dy = -maxShift;
+      }
+    }
+
+    // On repart toujours de la transform d'origine stockée au chargement
+    const base = (el.dataset && el.dataset.baseTransform) ? el.dataset.baseTransform : '';
+    const extra = (dy !== 0) ? ` translate(0 ${dy})` : '';
+    el.setAttribute('transform', (base + extra).trim());
+  }
+
+  function setWindingConduction(el, duty){
+    if (!el) return;
+    const d = Math.max(0, Math.min(1, duty));
+    const alpha = 0.02 + 0.98 * d; // plus de contraste sur les enroulements
+    el.style.opacity = alpha.toFixed(2);
+  }
+
+  function dutyToMag(duty){
+    // non utilisé maintenant, conservé au cas où
+    return Math.max(0, Math.min(1, duty));
+  }
+
+  // appelée à chaque frame globale, mais utilise les Ta/Tb/Tc fournis par drawHex()
+  function updateInverterFromState(){
+    if (!inverterSvg || !igbtMap) return;
+
+    // États logiques Sa/Sb/Sc → IGBTs ON/OFF (translation binaire)
+    const Sa = inverterSwitch.Sa;
+    const Sb = inverterSwitch.Sb;
+    const Sc = inverterSwitch.Sc;
+
+    // Inversion locale pour coller visuellement au code affiché :
+    // bit = 1 → IGBT du bas passant sur le petit onduleur (plus intuitif visuellement ici)
+    setIgbtConduction(igbtMap.aTop, Sa ? 0 : 1);
+    setIgbtConduction(igbtMap.aBot, Sa ? 1 : 0);
+
+    setIgbtConduction(igbtMap.bTop, Sb ? 0 : 1);
+    setIgbtConduction(igbtMap.bBot, Sb ? 1 : 0);
+
+    setIgbtConduction(igbtMap.cTop, Sc ? 0 : 1);
+    setIgbtConduction(igbtMap.cBot, Sc ? 1 : 0);
+
+    // On garde Ta/Tb/Tc pour l'intensité dans les enroulements moteur
+    const Ta = inverterConduction.Ta;
+    const Tb = inverterConduction.Tb;
+    const Tc = inverterConduction.Tc;
+
+
+    // Enroulements moteur : luminosité proportionnelle au duty,
+    // mais "gâtée" par l'état logique Sa/Sb/Sc pour une synchro parfaite
+    if (windingMap){
+      const dA = Sa ? Ta : 0;
+      const dB = Sb ? Tb : 0;
+      const dC = Sc ? Tc : 0;
+      setWindingConduction(windingMap.a, dA);
+      setWindingConduction(windingMap.b, dB);
+      setWindingConduction(windingMap.c, dC);
+    }
+
+    // Texte des phases Ta/Tb/Tc sous l'onduleur
+    const aSpan = document.getElementById('phaseDutyA');
+    const bSpan = document.getElementById('phaseDutyB');
+    const cSpan = document.getElementById('phaseDutyC');
+    if (aSpan) aSpan.textContent = 'Ta = ' + (Ta*100).toFixed(1) + ' %';
+    if (bSpan) bSpan.textContent = 'Tb = ' + (Tb*100).toFixed(1) + ' %';
+    if (cSpan) cSpan.textContent = 'Tc = ' + (Tc*100).toFixed(1) + ' %';
+  }
+
+function loop(now){
+    const dt = (now - lastFrameTime)/1000;
+    lastFrameTime = now;
+    if (state.running){
+      // temps de simulation (affecté par le ralentisseur)
+      state.t += dt * state.speedFactor;
+      // temps "marqueur" utilisé pour le point 1 Hz et la barre verticale (indépendant du ralentisseur)
+      state.markerT += dt;
+
+      const tSpan = document.getElementById('timeVal');
+      if (tSpan) tSpan.textContent = state.t.toFixed(3);
+      // updateInverterFromState déplacé dans drawHex() pour une synchro parfaite IGBT/enroulements
+    }
+    requestAnimationFrame(loop);
+  }
+
+
+  // ==== UI contrôles ====
+  (function initControls(){
+    const $ = id => document.getElementById(id);
+
+const freq = $('freq'),
+      amp = $('amp'),
+      imb = $('imb'),
+      theta = $('theta'),
+      rotorSel = $('rotorPoles');
+const lock = $('lock');
+
+    const rotorRadios = document.querySelectorAll('input[name="rotorMode"]');
+
+    const freqVal=$('freqVal'), ampVal=$('ampVal'), imbVal=$('imbVal'), thetaVal=$('thetaVal');
+    const slowmo = $('slowmo'), slowmoVal = $('slowmoVal');
+
+    if (freq){
+      freq.addEventListener('input', e=>{
+        state.freq = parseFloat(e.target.value||'50');
+        if (freqVal) freqVal.textContent = state.freq.toFixed(0);
+      });
+    }
+    if (amp){
+      amp.addEventListener('input', e=>{
+        state.amp = parseFloat(e.target.value||'1.0');
+        if (ampVal) ampVal.textContent = state.amp.toFixed(1);
+      });
+    }
+    if (imb){
+      imb.addEventListener('input', e=>{
+        state.imb = parseFloat(e.target.value||'0')/100;
+        if (imbVal) imbVal.textContent = e.target.value;
+      });
+    }
+    if (theta){
+      theta.addEventListener('input', e=>{
+        state.thetaOff = parseFloat(e.target.value||'0');
+        if (thetaVal) thetaVal.textContent = state.thetaOff.toFixed(0);
+      });
+    }
+
+    if (rotorSel){
+      rotorSel.addEventListener('change', e=>{
+        const v = parseInt(e.target.value || '2', 10);
+        state.rotorPoles = (v === 4 ? 4 : 2);
+        if (rotorRadios){
+          rotorRadios.forEach(r=>{
+            if (parseInt(r.value,10) === state.rotorPoles) r.checked = true;
+          });
+        }
+      });
+    }
+
+    if (rotorRadios && rotorRadios.length){
+      rotorRadios.forEach(r=>{
+        r.addEventListener('change', e=>{
+          if (!e.target.checked) return;
+          const v = parseInt(e.target.value || '2', 10);
+          state.rotorPoles = (v === 4 ? 4 : 2);
+          if (rotorSel){
+            rotorSel.value = String(state.rotorPoles);
+          }
+        });
+      });
+    }
+
+    if (lock){
+      lock.addEventListener('change', e=>{
+        state.lock = e.target.checked;
+      });
+    }
+
+    const playPause = $('playPause');
+    if (playPause){
+      playPause.addEventListener('click', ()=>{
+        state.running = !state.running;
+        playPause.textContent = state.running ? '⏸ Pause' : '▶ Reprendre';
+      });
+    }
+
+    if (slowmo){
+      slowmo.addEventListener('input', e=>{
+        const v = parseFloat(e.target.value||'1');
+        state.speedFactor = v;
+        if (slowmoVal) slowmoVal.textContent = v.toFixed(2)+'×';
+      });
+    }
+
+    const stepBtn = $('svpwmStepBtn');
+    const stepModeChk = $('svpwmStepMode');
+
+    if (stepModeChk){
+      stepModeChk.addEventListener('change', e=>{
+        state.svpwmStepMode = e.target.checked;
+        if (state.svpwmStepMode){
+          state.running = false;
+          state.svpwmSeqPos = 0;
+          const pp = $('playPause');
+          if (pp) pp.textContent = '▶ Reprendre';
+        }
+      });
+    }
+
+    if (stepBtn){
+      stepBtn.addEventListener('click', ()=>{
+        state.svpwmStepMode = true;
+        state.running = false;
+        state.svpwmStepIndex = ((state.svpwmStepIndex || 0) + 1) % 200;
+        state.svpwmSeqPos = ((state.svpwmSeqPos || 0) + 1) % 5;
+        const pp = $('playPause');
+        if (pp) pp.textContent = '▶ Reprendre';
+      });
+    }
+
+    const modeBtns = document.querySelectorAll('.mode-switch button');
+    modeBtns.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        modeBtns.forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        const svPanel = document.getElementById('panel-svpwm');
+        const formPanel = document.getElementById('panel-formulas');
+        if (mode === 'intro'){
+          if (svPanel) svPanel.style.display = 'none';
+          if (formPanel) formPanel.style.display = 'none';
+        } else if (mode === 'full'){
+          if (svPanel) svPanel.style.display = '';
+          if (formPanel) formPanel.style.display = '';
+        } else if (mode === 'expert'){
+          if (svPanel) svPanel.style.display = '';
+          if (formPanel) formPanel.style.display = '';
+        }
+      });
+    });
+  })();
+
+  // ==== Interaction avec le schéma SVG (clic -> scroll) ====
+  (function initSchema(){
+    const container = document.getElementById('schema-foc');
+    if (!container) return;
+    container.addEventListener('click', (e)=>{
+      const target = e.target.closest('[data-panel]');
+      if (!target) return;
+      const panelId = target.getAttribute('data-panel');
+      const panel = document.getElementById(panelId);
+      if (panel){
+        panel.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+    });
+  })();
+
+  function makeFormulaSketch(p){
+    p.setup = function(){
+      p.createCanvas(350,250).parent('formula-holder');
+      p.pixelDensity(2);
+      p.textFont('Inter');
+    };
+    p.draw = function(){
+      const w = p.width, h = p.height;
+      p.background('#020617');
+      p.fill('#e5e7eb');
+      p.textSize(18);
+      const m = modelAt(simTime());
+      // Clarke
+      p.text('iα = 2/3 ( ia - 1/2 ib - 1/2 ic ) = ' + m.alpha.toFixed(2), 14, 44);
+      p.text('iβ = 2/3 ( √3/2 (ib - ic) ) = ' + m.beta.toFixed(2), 14, 64);
+      // Park
+      p.text('id =  iα cosθ + iβ sinθ = ' + m.d.toFixed(2), 14, 94);
+      p.text('iq = -iα sinθ + iβ cosθ = ' + m.q.toFixed(2), 14, 114);
+    };
+  }
+
+
+  // ==== Création des sketchs p5 ====
+  new p5(makeFormulaSketch);
+  
+
+  // ==== Init SVPWM + boucle globale ====
+  initSVPWM();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+
+
+<script>
+
+function initSchemaTooltips() {
+
+  const tooltip = document.getElementById('schema-tooltip');
+  const targets = document.querySelectorAll('#schema-foc .tooltip-target');
+
+  const helpOverlay = document.getElementById('schema-help-overlay');
+  const helpTitle   = document.getElementById('schema-help-title');
+  const helpText    = document.getElementById('schema-help-text');
+  const helpClose   = document.getElementById('schema-help-close');
+
+if (!tooltip || !helpOverlay || !helpTitle || !helpText) return;
+
+
+  /* Dictionnaire d'aides détaillées par id de bloc */
+  const helpData = {
+    // --- Boucle vitesse ---
+    ctrl_vit: {
+      title: "Contrôle de la vitesse",
+      text: `
+        La boucle de vitesse compare la vitesse demandée à la vitesse réelle (ou estimée)
+        et calcule la consigne de couple Iq*. Elle utilise généralement un régulateur PI.
+        <br><br>
+        Quand la vitesse est inférieure à la consigne, le bloc augmente Iq* pour fournir
+        plus de couple. Quand la vitesse dépasse la consigne, il réduit Iq* pour freiner
+        la machine. C'est lui qui garantit que le moteur suit les profils de vitesse
+        même en présence de variations de charge.`
+    },
+	
+	vi_po: {
+    title: "estimation de la vitesse et de la position du rotor",
+    text: `déduit la vitesse et la position du rotor (θ, ω)
+           à partir des grandeurs mesurées et du modèle électrique de la machine.`
+},
+
+	
+      
+   // --- Estimation vitesse / position (à adapter au bon id) ---
+    aff_flux: {
+      title: "Affaiblissement du flux",
+      "text": `
+      Le flux weakening réduit le flux magnétique en haute vitesse en appliquant un courant Id négatif. Cela évite la saturation de tension quand la vitesse augmente, permettant de dépasser la vitesse nominale au prix d’une réduction du couple disponible.`
+    },
+
+    // --- Transformées ---
+    clarke: {
+      title: "Transformée de Clarke",
+      text: `
+        La transformée de Clarke projette les courants triphasés abc dans un repère fixe αβ.
+        Elle permet de représenter le système triphasé par un seul vecteur dans le plan
+        statorique, ce qui simplifie fortement l'analyse et la commande.
+        <br><br>
+        À partir de ia, ib, ic, on obtient iα et iβ, qui sont ensuite utilisés par la
+        transformée de Park pour passer dans le repère dq.`
+    },
+
+    park: {
+      title: "Transformée de Park",
+      text: `
+        La transformée de Park fait tourner le vecteur statorique (αβ) dans un repère dq
+        synchronisé avec la position du rotor. Dans ce repère tournant, les composantes
+        de courant se séparent en :
+        <br>• Id : liée au flux
+        <br>• Iq : liée au couple
+        <br><br>
+        Ce découplage flux / couple est au cœur du contrôle vectoriel (FOC).`
+    },
+
+    park_1: {
+      title: "Transformée de Park inverse",
+      text: `
+        La transformée de Park inverse repasse du repère tournant dq vers le repère fixe αβ.
+        <br>Elle permet de reconstruire un vecteur de tension ou de courant dans le repère
+        statorique à partir des composantes Id et Iq.`
+    },
+
+    clarke_1: {
+      title: "Transformée de Clarke inverse",
+      text: `
+        La transformée de Clarke inverse recompose les valeurs triphasées abc à partir
+        des composantes iα et iβ. <br>Elle permet de retrouver les courants ou tensions de phase
+        qui seront ensuite appliqués à l'onduleur.`
+    },
+
+    // --- Régulateurs de courant ---
+    pi_f: {
+      title: "Régulateur PI de Id (flux)",
+      text: `
+        Ce régulateur compare la consigne de courant Id* au courant Id mesuré et corrige
+        l'erreur pour maintenir le flux magnétique au niveau souhaité. Sa sortie est la
+        tension de référence Vd*.
+        <br><br>
+        En maintenant Id proche de Id*, on impose le flux dans la machine, ce qui stabilise
+        le comportement du moteur et prépare un bon contrôle du couple via Iq.`
+    },
+
+    pi_v: {
+      title: "Régulateur PI de Iq (couple)",
+      text: `
+        Ce PI compare la consigne de courant Iq* (provenant de la boucle de vitesse ou de
+        la consigne de couple) au courant Iq mesuré. Il génère la tension de référence Vq*.
+        <br><br>
+        En ajustant Iq, on contrôle directement le couple électromagnétique du moteur, donc
+        les accélérations, les rampes de vitesse et la tenue au couple de charge.`
+    },
+
+D1: {
+	title: "Diode de redressement",
+	text:
+	`La diode est un semi-conducteur = matériau qui se comporte comme un contact fermé (passant) ou ouvert (bloqué) en fonction de sa polarisation. Intérêt: pas d'usure car pas de contact mobile, rapidité de commutation. Défaut: la faible distance d'isolement dans le semi-conducteur, par conséquent la diode est sensible aux dépassements des grandeurs électriques pour lesquelles elle est prévue de fonctionner `
+
+},
+
+D2: {
+	title: "Diode de redressement",
+	text:
+	`La diode est un semi-conducteur = matériau qui se comporte comme un contact fermé (passant) ou ouvert (bloqué) en fonction de sa polarisation. Intérêt: pas d'usure car pas de contact mobile, rapidité de commutation. Défaut: la faible distance d'isolement dans le semi-conducteur, par conséquent la diode est sensible aux dépassements des grandeurs électriques pour lesquelles elle est prévue de fonctionner `
+
+},
+D3: {
+	title: "Diode de redressement",
+	text:
+	`La diode est un semi-conducteur = matériau qui se comporte comme un contact fermé (passant) ou ouvert (bloqué) en fonction de sa polarisation. Intérêt: pas d'usure car pas de contact mobile, rapidité de commutation. Défaut: la faible distance d'isolement dans le semi-conducteur, par conséquent la diode est sensible aux dépassements des grandeurs électriques pour lesquelles elle est prévue de fonctionner `
+
+},
+D4: {
+	title: "Diode de redressement",
+	text:
+	`La diode est un semi-conducteur = matériau qui se comporte comme un contact fermé (passant) ou ouvert (bloqué) en fonction de sa polarisation. Intérêt: pas d'usure car pas de contact mobile, rapidité de commutation. Défaut: la faible distance d'isolement dans le semi-conducteur, par conséquent la diode est sensible aux dépassements des grandeurs électriques pour lesquelles elle est prévue de fonctionner `
+
+},
+D5: {
+	title: "Diode de redressement",
+	text:
+	`La diode est un semi-conducteur = matériau qui se comporte comme un contact fermé (passant) ou ouvert (bloqué) en fonction de sa polarisation. Intérêt: pas d'usure car pas de contact mobile, rapidité de commutation. Défaut: la faible distance d'isolement dans le semi-conducteur, par conséquent la diode est sensible aux dépassements des grandeurs électriques pour lesquelles elle est prévue de fonctionner `
+
+},
+D6: {
+	title: "Diode de redressement",
+	text:
+	`La diode est un semi-conducteur = matériau qui se comporte comme un contact fermé (passant) ou ouvert (bloqué) en fonction de sa polarisation. Intérêt: pas d'usure car pas de contact mobile, rapidité de commutation. Défaut: la faible distance d'isolement dans le semi-conducteur, par conséquent la diode est sensible aux dépassements des grandeurs électriques pour lesquelles elle est prévue de fonctionner `
+
+},
+
+    // --- Chaîne puissance ---
+    red: {
+      title: "Redresseur",
+      text: `
+        Le redresseur convertit la tension AC du réseau en tension DC pour alimenter le bus
+        continu. <br>Il fournit la source d'énergie principale de l'onduleur.`
+    },
+
+    bus: {
+      title: "Bus DC",
+      text: `
+        Le bus continu relie le redresseur à l'onduleur. Sa tension doit rester suffisante
+        et relativement stable pour que le SVPWM puisse synthétiser correctement les tensions
+        triphasées désirées.`
+    },
+
+    ond: {
+      title: "Onduleur triphasé",
+      text: `
+        L'onduleur triphasé commute ses transistors selon les ordres du SVPWM pour appliquer
+        au moteur des tensions AC contrôlées. <br>Il transforme l'énergie du bus DC en tensions
+        triphasées synchronisées avec la commande vectorielle.`
+    },
+
+igbt_T1: {
+	title: "Transistor de puissance (IGBT)",
+	text:
+	`Le transistor est un semi conducteur qui possède un "contact statique" de puissance [semi-conducteur] situé entre collecteur et emetteur, dont la fermeture (état passant) et l'ouverture (état bloqué) sont pilotés par une impulsion de faible énergie appliqué entre Grille et emetteur. Il possède les mêmes fragilités que la diode.`
+},
+
+
+igbt_T2: {
+	title: "Transistor de puissance (IGBT)",
+	text:
+	`Le transistor est un semi conducteur qui possède un "contact statique" de puissance [semi-conducteur] situé entre collecteur et emetteur, dont la fermeture (état passant) et l'ouverture (état bloqué) sont pilotés par une impulsion de faible énergie appliqué entre Grille et emetteur. Il possède les mêmes fragilités que la diode.`
+},
+
+igbt_T3: {
+	title: "Transistor de puissance (IGBT)",
+	text:
+	`Le transistor est un semi conducteur qui possède un "contact statique" de puissance [semi-conducteur] situé entre collecteur et emetteur, dont la fermeture (état passant) et l'ouverture (état bloqué) sont pilotés par une impulsion de faible énergie appliqué entre Grille et emetteur. Il possède les mêmes fragilités que la diode.`
+},
+
+igbt_T4: {
+	title: "Transistor de puissance (IGBT)",
+	text:
+	`Le transistor est un semi conducteur qui possède un "contact statique" de puissance [semi-conducteur] situé entre collecteur et emetteur, dont la fermeture (état passant) et l'ouverture (état bloqué) sont pilotés par une impulsion de faible énergie appliqué entre Grille et emetteur. Il possède les mêmes fragilités que la diode.`
+},
+
+igbt_T5: {
+	title: "Transistor de puissance (IGBT)",
+	text:
+	`Le transistor est un semi conducteur qui possède un "contact statique" de puissance [semi-conducteur] situé entre collecteur et emetteur, dont la fermeture (état passant) et l'ouverture (état bloqué) sont pilotés par une impulsion de faible énergie appliqué entre Grille et emetteur. Il possède les mêmes fragilités que la diode.`
+},
+
+	igbt_T6: {
+	title: "Transistor de puissance (IGBT)",
+	text:
+	`Le transistor est un semi conducteur qui possède un "contact statique" de puissance [semi-conducteur] situé entre collecteur et emetteur, dont la fermeture (état passant) et l'ouverture (état bloqué) sont pilotés par une impulsion de faible énergie appliqué entre Grille et emetteur. Il possède les mêmes fragilités que la diode.`
+},
+
+
+    synrmRotorFOC: {
+      title: "Modèle moteur",
+      text: `
+        Le rotor SynRM ou PMSM possède deux axes distincts :
+<br>axe d (axe direct) = zone faible réluctance, chemin magnétique facile
+<br>axe q (axe en quadrature) = zone forte réluctance, chemin magnétique difficile
+
+<br>Cette différence crée une anisotropie magnétique (Ld > Lq).
+<br>Quand le champ statorique tourne, le rotor s’oriente naturellement pour minimiser la réluctance.
+
+<br>Un couple reluctant aligne mécaniquement le rotor sur le champ statorique.`
+    },
+
+    mot_relu1:{
+	title:"Enroulements statoriques",
+	text:
+	`Un champ tournant, est créé par les 3 enroulements statoriques décalés de 120° géométriques et alimentés par un réseau triphasé déphasés de 120° électriques `
+	
+	
+	},
+
+    tc_ti: {
+      title: "Mesure des courants (TC/TI)",
+      text: `
+        Les capteurs de courant (transformateurs de courant, shunts, etc.) mesurent les
+        courants de phase ou les courants dans le bus DC. Ces valeurs alimentent les
+        transformées de Clarke/Park et les boucles de régulation Id/Iq.`
+    }
+  };
+  
+  
+  
+  // Tooltips au survol (data-info)
+  targets.forEach(el => {
+    const info = el.getAttribute('data-info');
+
+    el.addEventListener('mousemove', (e) => {
+      if (!info) return;
+      tooltip.style.opacity = '1';
+      tooltip.innerHTML = info;
+      tooltip.style.left = (e.clientX + 16) + 'px';
+      tooltip.style.top  = (e.clientY - 10) + 'px';
+    });
+
+    el.addEventListener('mouseleave', () => {
+      tooltip.style.opacity = '0';
+    });
+
+    // Clic = ouvre le panneau d'aide détaillée
+    el.addEventListener('click', () => {
+      const id = el.id;
+      if (!helpData[id]) return;
+      helpTitle.textContent = helpData[id].title;
+      helpText.innerHTML    = helpData[id].text;
+      helpOverlay.style.display = 'flex';
+    });
+  });
+
+  if (helpClose) {
+    helpClose.addEventListener('click', () => {
+      helpOverlay.style.display = 'none';
+    });
+  }
+}
+
+// 1) Init de base au chargement de la page
+document.addEventListener('DOMContentLoaded', initSchemaTooltips);
+</script>
+
+
+
+
+
+<script>
+(function(){
+  // Animation simple de la MCC : rotation de l'induit + pulsation du flux
+  function initMccAnimation(){
+    var mccSvg = document.querySelector('#mcc-panel svg');
+    if (!mccSvg) return;
+
+    // Rotor (induit)
+    var rotor = document.getElementById('induit_r');
+
+    // --- FLUX : flèche + texte ---
+    // Nouveau SVG : groupe g1 qui contient la flèche (id="a") et le texte (id="Flux")
+    var fluxGroup  = document.getElementById('g1');
+    var fluxArrow  = document.getElementById('Flux_f') || document.getElementById('a'); // compatibilité ancienne / nouvelle version
+    var fluxLabel  = document.getElementById('Flux');
+
+    // Préparation de la rotation du rotor autour de son centre géométrique
+    var cx = 0, cy = 0;
+    var baseTransform = "";
+    if (rotor){
+      var circle = rotor.querySelector('circle');
+      if (circle){
+        cx = parseFloat(circle.getAttribute('cx')) || 0;
+        cy = parseFloat(circle.getAttribute('cy')) || 0;
+      }
+      baseTransform = rotor.getAttribute('transform') || "";
+    }
+
+    var start = null;
+    function step(timestamp){
+      if (start === null) start = timestamp;
+      var t = (timestamp - start) / 1000; // secondes
+
+      // Rotation continue du rotor
+      if (rotor){
+        var angle = (t * 90) % 360; // vitesse de rotation en °/s
+        var tf = (baseTransform + " rotate(" + angle.toFixed(2) + " " + cx + " " + cy + ")").trim();
+        rotor.setAttribute('transform', tf);
+      }
+
+      // Pulsation du flux (flèche + texte)
+      if (fluxGroup || fluxArrow || fluxLabel){
+        // pulsation douce de l'opacité entre ~0.4 et 1.0
+        var pulse = 0.5 + 0.5 * Math.sin(2 * Math.PI * 1.2* t); // 0.5 Hz
+        var alpha = 0.5 + 0.5 * pulse;
+        var op = alpha.toFixed(2);
+
+        if (fluxGroup){
+          fluxGroup.style.opacity = op;
+        } else {
+          if (fluxArrow) fluxArrow.style.opacity = op;
+          if (fluxLabel) fluxLabel.style.opacity = op;
+        }
+      }
+
+      window.requestAnimationFrame(step);
+    }
+
+    window.requestAnimationFrame(step);
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initMccAnimation);
+  } else {
+    initMccAnimation();
+  }
+
+})();
+
+
+
+
+document.addEventListener('DOMContentLoaded', function(){
+
+  const mccSvg  = document.querySelector('#mcc-panel svg');
+  const mccTip  = document.getElementById('mcc-tooltip');
+  if (!mccSvg || !mccTip) return;
+
+  function showMccTip(evt, html){
+    mccTip.style.display = 'block';
+    mccTip.innerHTML = html;
+    // position près de la souris
+    const offsetX = 12;
+    const offsetY = 12;
+    mccTip.style.left = (evt.clientX + offsetX) + 'px';
+    mccTip.style.top  = (evt.clientY + offsetY) + 'px';
+  }
+
+  function hideMccTip(){
+    mccTip.style.display = 'none';
+  }
+
+  function bindTip(id, html){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.cursor = 'help';
+    el.addEventListener('mousemove', (e)=> showMccTip(e, html));
+    el.addEventListener('mouseleave', hideMccTip);
+  }
+
+  // 🎯 Ensemble des tooltips MCC
+  bindTip('text11', `
+    <b>Machine à courant continu (MCC)</b><br>
+    Vue globale d&apos;une MCC à excitation indépendante, utilisée
+    ici comme référence pour comprendre le principe du FOC.
+  `);
+
+  bindTip('Inducteur1', `
+    <b>Inducteur (stator)</b><br>
+    Partie fixe qui crée le flux magnétique principal &Phi; grâce
+    au courant d&apos;excitation. En FOC, c&apos;est le rôle du courant
+    <b>Id</b> : fixer le flux.
+  `);
+  bindTip('Inducteur', `
+    <b>Inducteur (stator)</b><br>
+    Enroulements ou aimants qui génèrent le champ magnétique.
+    Flux quasiment constant si la commande d&apos;excitation ne varie pas.
+  `);
+
+  bindTip('induit_r', `
+    <b>Induit (rotor / armature)</b><br>
+    Partie tournante parcourue par le courant. L&apos;interaction
+    entre le flux de l&apos;inducteur et le courant de l&apos;induit
+    produit le couple électromagnétique.
+  `);
+
+  bindTip('Flux_f', `
+    <b>Flux &Phi;</b><br>
+    Flux magnétique créé par l&apos;inducteur. Dans une MCC à excitation
+    séparée, on suppose souvent le flux constant. En FOC, on cherche
+    à maintenir <b>Id</b> (et donc le flux) à une valeur cible.
+  `);
+  bindTip('Flux', `
+    <b>Flux &Phi;</b><br>
+    Représentation du flux magnétique principal dans la machine.
+    C&apos;est l&apos;analogue du courant <b>Id</b> dans le repère d–q.
+  `);
+
+  bindTip('Cple', `
+    <b>Couple électromagnétique T</b><br>
+    Proportionnel au produit <b>Flux × courant d&apos;induit</b>.
+    En FOC, c&apos;est le courant <b>Iq</b> (axe q) qui joue le rôle
+    du courant d&apos;induit de la MCC.
+  `);
+  bindTip('Couple', `
+    <b>Couple T</b><br>
+    Grandeur mécanique résultante du champ magnétique et du courant
+    dans le rotor. En FOC, on commande directement le couple via Iq.
+  `);
+
+  bindTip('Id', `
+    <b>Id – courant de flux (axe d)</b><br>
+    Composante alignée avec le flux. Son rôle est analogue à celui
+    du courant d&apos;inducteur dans une MCC : fixer la valeur de &Phi;.
+  `);
+
+  bindTip('Iq', `
+    <b>Iq – courant de couple (axe q)</b><br>
+    Composante en quadrature du flux. C&apos;est elle qui produit le couple,
+    comme le courant d&apos;induit dans une MCC à excitation séparée.
+  `);
+
+});
+
+
+
+
+function toggleIphaseHelp(){
+  const box = document.getElementById('iphasetooltip');
+  if (!box) return;
+  box.style.display = (box.style.display === 'block') ? 'none' : 'block';
+}
+
+let clarkeParkVisible = false;
+
+function toggleClarkeParkIntro(){
+  clarkeParkVisible = !clarkeParkVisible;
+
+  const content = document.getElementById('clarke-park-content');
+  const btn     = document.getElementById('btnToggleClarkePark');
+
+  if (!content || !btn) return;
+
+  content.style.display = clarkeParkVisible ? 'block' : 'none';
+  btn.textContent = clarkeParkVisible ? 'Masquer' : 'Afficher';
+}
+
+
+
+
+
+</script>
+
+
+
+
+<script>
+(async () => {
+  try {
+    // Charge le fichier SVG externe
+    const response = await fetch("w_11_12.svg");
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const svgText = await response.text();
+
+    // Parse proprement le texte SVG
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+    const svgEl = svgDoc.documentElement;
+
+    // Injection dans le conteneur prévu
+    const container = document.getElementById("schema-foc-container");
+    if (!container) {
+      console.error("Conteneur #schema-foc-container introuvable");
+      return;
+    }
+    container.innerHTML = "";
+    container.appendChild(svgEl);
+
+// 2) Rebranche les tooltips/applis sur le SVG fraîchement injecté
+if (typeof initSchemaTooltips === 'function') {
+  initSchemaTooltips();
+}
+
+
+
+
+  } catch (err) {
+    console.error("Erreur chargement schéma FOC :", err);
+    const errorDiv = document.getElementById("load-error");
+    if (errorDiv) {
+      errorDiv.style.display = "block";
+      errorDiv.textContent =
+        "Erreur de chargement du schéma FOC (w_11_12.svg).";
+    }
+  }
+})();
+</script>
+
+<script>
+(function () {
+  // Bloque le clic droit
+  document.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+  });
+
+  // Bloque quelques raccourcis "classiques" (faciles à contourner, mais ça décourage)
+  document.addEventListener("keydown", function (e) {
+    const key = e.key.toLowerCase();
+
+    // F12, Ctrl+U, Ctrl+Shift+I/J
+    if (
+      e.key === "F12" ||
+      (e.ctrlKey && key === "u") ||
+      (e.ctrlKey && e.shiftKey && (key === "i" || key === "j"))
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+})();
+</script>
+
+
+
+
+
+
+</body>
+</html>
