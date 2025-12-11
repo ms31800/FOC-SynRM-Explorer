@@ -42,7 +42,7 @@ L’interface a été conçue pour faciliter la compréhension :
 - **JavaScript**
 - **SVG dynamique**
 - **fetch() / DOMParser**
-- **p5.js** pour l’animation (si applicable dans ta version)
+- **p5.js** pour l’animation 
 - **GitHub Pages** pour l’hébergement
 
 
