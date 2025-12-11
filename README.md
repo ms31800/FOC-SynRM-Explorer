@@ -50,8 +50,8 @@ L’interface a été conçue pour faciliter la compréhension :
 ## Origine du projet
 
 Il fait suite à la création d'une FCIL (Formation Complémentaire d’Initiative Locale):
-Conseils,Installations, Maintenance Des motorisations électriques industrielles à haute efficacité énergétique qui est dispensée dans notre établissement.
-
+Conseils,Installations, Maintenance Des motorisations électriques industrielles à haute efficacité énergétique qui est dispensée dans notre établissement, et qui aborde le dimensionnement 
+ainsi que la mise en oeuvre de ces nouvelles générations de moto variateurs. 
 
 ##  Déploiement
 
